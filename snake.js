@@ -445,8 +445,8 @@ function reset_game(){
 	head = {x:50, y: 250};
 	body = [{x:40, y:250}];
 	poos = [];
-	food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
-	//food_position = {x:250, y:250};
+	//food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
+	food_position = {x:250, y:250};
 	food_state = "uneaten";
 	dx = 10;
 	dy = 10;
