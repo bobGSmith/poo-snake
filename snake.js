@@ -16,6 +16,27 @@ var top_boarder = 50;
 
 
 
+var new_segment = null 
+var head = {x:50, y: 250};
+var body = [{x:40, y:250}];
+var poos = [];
+var food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
+//var food_position = {x:250, y:250};
+var food_state = "uneaten";
+var dx = 10;
+var dy = 10;
+var score = 0;
+var level = 1;
+var game_paused = false;
+var direction = "e";
+var speed = 250;
+var score_add = false;
+var dead = "not";
+var food_drawing = "mouse"
+var again = false;
+
+
+
 // FUNCTIONS //
 
 function round10(n){
@@ -420,24 +441,7 @@ function main(){
 }
 //////////////////////////////////////////////////////////////////////////////////////
 
-var new_segment = null 
-var head = {x:50, y: 250};
-var body = [{x:40, y:250}];
-var poos = [];
-var food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
-//var food_position = {x:250, y:250};
-var food_state = "uneaten";
-var dx = 10;
-var dy = 10;
-var score = 0;
-var level = 1;
-var game_paused = false;
-var direction = "e";
-var speed = 250;
-var score_add = false;
-var dead = "not";
-var food_drawing = "mouse"
-var again = false;
+
 
 
 // MAIN GAME //
