@@ -340,13 +340,15 @@ function collision(){
 		food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
 		food_state = "uneaten";
 		food_drawing = "mouse";
-	} else if (headInBody) {
-		dead = "body"; food_drawing = "mouse"; food_state = "uneaten";
-	} else if (headInPoos){
-		dead = "poo"; food_drawing = "mouse"; food_state = "uneaten";
 	} else {
 		food_drawing = "mouse"; food_state = "uneaten";
 	}
+	if (headInBody) {
+		dead = "body"; food_drawing = "mouse"; food_state = "uneaten";
+	} 
+	if (headInPoos){
+		dead = "poo"; food_drawing = "mouse"; food_state = "uneaten";
+	} 
 }
 
 var game_paused = false;
