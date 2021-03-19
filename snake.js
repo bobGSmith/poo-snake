@@ -353,13 +353,26 @@ function collision(){
 
 var game_paused = false;
 
+
 function level_up(){
 	var lvl_a = "LVL UP LVL UP LVL UP LVL";
 	var y_pos = top_boarder + 20;
 	game_paused = true;
 	var lvlupId = window.setInterval(function lvl_animate(){
 		ctx.font = "20px Courier";
-		ctx.fillStyle = "white";
+		if (level <= 3){
+			lvl_a = "NOT BAD LEVEL UP NOT BAD";
+			ctx.fillStyle = "green";
+		} else if (level > 3 && level <= 6){
+			lvl_a = "LVL WHAT DID YOU EAT LVL"
+			ctx.fillStyle = "yellow";
+		} else if (level > 6 && level <= 9){
+			lvl_a = "!! YOU'R IN DEEP SHIT !!"
+			ctx.fillStyle = "red";
+		} else {
+			lvl_a = "LVL ITS A SHIT FEST LVL"
+			ctx.fillStyle = "white";
+		}
 		ctx.fillText(lvl_a, 5 ,y_pos);	
 		ctx.clearRect(45,118,220, 52);
 		ctx.font = "40px Courier";
