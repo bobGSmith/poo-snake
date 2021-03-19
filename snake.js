@@ -322,17 +322,18 @@ function is_coord_in_list(item, list){
 	return isin;
 }
 
+
 function collision(){
 	var headInBody = is_coord_in_list(head, body); 
 	var foodInBody = is_coord_in_list(food_position, body);
 	var headInPoos = is_coord_in_list(head, poos);
+	var headInFood = is_position_same(food_position, head);
 	score_add = false; dead = "not";
-	
 	if (headInBody) {
 		dead = "body"; food_drawing = "mouse"; food_state = "uneaten";
-	} else if (headInPoos){
+	} else if (headInPoos && !(headInFood)){
 		dead = "poo"; food_drawing = "mouse"; food_state = "uneaten";
-	} else if (is_position_same(food_position, head) && food_state == "uneaten"){
+	} else if (headInFood && food_state == "uneaten"){
 		food_state = "digesting"; score_add = true;
 		food_drawing = "full_head";
 	} else if (foodInBody == true && food_state == "digesting"){
