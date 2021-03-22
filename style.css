@@ -26,8 +26,8 @@ button {
 	background-color: green;
 	color: white;
 	text-align: center;
-	height: 45px;
-	width: 45px;
+	height: 40px;
+	width: 40px;
 	border-radius: 8px;
 	
 
@@ -58,8 +58,8 @@ button {
 	display: grid;
 	justify-content: center;
 	grid-column-gap: 1px;
-	grid-template-columns: 45px 45px 45px;
-	grid-template-rows: 45px 45px 45px;
+	grid-template-columns: 40px 40px 40px;
+	grid-template-rows: 40px 40px 40px;
 	grid-template-areas: 
 		". up ."
 		"left . right"
