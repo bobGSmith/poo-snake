@@ -18,6 +18,14 @@ var width = 300;
 var height = 350;
 var top_boarder = 50;
 
+
+// prevent arrow key scrolling //
+window.addEventListener("keydown", function(e) {
+    if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+        e.preventDefault();
+    }
+}, false);
+
 // FUNCTIONS //
 
 function round10(n){
