@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+  
+    <title id="t1">Poo Snake - The real snake number 2</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body style="background-color:black;">
+
+
+    <!--FIREBASE STUFF-->
+    <!-- The core Firebase JS SDK is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/8.3.2/firebase-app.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.3.2/firebase-analytics.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.3.2/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.3.2/firebase-database.js"></script>
+    <!-- TODO: Add SDKs for Firebase products that you want to use
+     https://firebase.google.com/docs/web/setup#available-libraries -->
+
+
+
+
+    <h1 title="The real snake number 2"><b style="color:saddlebrown;">POO </b><b>SNAKE</b></h1>
+    <center><input type="text" value="Enter Name" id="username" /></center>
+    <canvas id="gameWindow" width="300" height="350"></canvas>
+
+
+    <!--Adding buttons for mobile play-->
+    <br />
+
+    <div class="button-container" id="bContainer">
+        <div class="item-up" id="upContainer"><button id="bUp">U</button></div>
+        <div class="item-left" id="leftContainer"><button id="bLeft">L</button></div>
+        <div class="item-right" id="rightContainer"><button id="bRight">R</button></div>
+        <div class="item-down" id="downContainer"><button id="bDown">D</button></div>
+    </div>
+
+    <script src="snake.js"></script>
+
+
+</body>
+
+</html>

@@ -1,0 +1,727 @@
+					
+// FIREBASE
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+var firebaseConfig = {
+apiKey: "AIzaSyBYkfKr10iHhMimA19ajX6kZds7sQ-f1DM",
+authDomain: "poosnake-7de7d.firebaseapp.com",
+projectId: "poosnake-7de7d",
+storageBucket: "poosnake-7de7d.appspot.com",
+messagingSenderId: "1090333629692",
+appId: "1:1090333629692:web:7c61ba3098aa5210790b79",
+measurementId: "G-0NKDV0VLRY"
+};
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+firebase.analytics();
+var playersRef = firebase.database().ref("players/");
+var PlayerName = "name";
+
+
+
+								//////////////////////
+								// SNAKE GAME LOGIC //
+								//////////////////////
+
+// INITIAL SETUP //
+
+var canvas = document.getElementById("gameWindow");
+var up_button = document.getElementById("bUp");
+var down_button = document.getElementById("bDown");
+var left_button = document.getElementById("bLeft");
+var right_button = document.getElementById("bRight");
+var ctx = canvas.getContext("2d");
+var bodysize_full = 10;
+var bodysize_empty = 4;
+var poosize = 2;
+var width = 300;
+var height = 350;
+var top_boarder = 50;
+
+// prevent arrow key scrolling
+window.addEventListener("keydown", function(e) {
+    if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+        e.preventDefault();
+    }
+}, false);
+
+// FUNCTIONS //
+
+
+
+function round10(n){
+	return (Math.round((n/10)))*10;
+}
+
+function draw_boarder(ctx,width, header_size = 50,thickness = 2, color = "Silver"){
+	var center_line = Math.floor((width/2));
+	ctx.lineWidth = thickness;
+	ctx.strokeStyle=color;
+	ctx.beginPath();
+	ctx.moveTo(0,header_size);
+	ctx.lineTo(width,header_size);
+	ctx.moveTo(center_line, 0);
+	ctx.lineTo(center_line,header_size);
+	ctx.stroke();
+	ctx.closePath();
+}
+
+function draw_circle(context,x,y,radius = 4, outline = "green",fill = "green"){
+	context.beginPath();
+	context.arc(x, y, radius, 0, 2*Math.PI);
+	context.fillStyle = fill;
+	context.fill();
+	context.lineWidth = 1;
+	context.strokeStyle = outline;
+	context.stroke();
+	context.closePath();
+}
+
+
+function draw_head(context,x,y,direction,radius = 6, outline = "green" ,fill = "green", eyes = "black"){
+	context.beginPath();
+	context.arc(x, y, radius, 0, 2*Math.PI);
+	context.fillStyle = fill;
+	context.fill();
+	context.lineWidth = 1;
+	context.strokeStyle = outline;
+	context.stroke();
+	context.closePath();
+	if (direction == "n" || direction == "s"){
+		//right eye
+		context.beginPath()
+		context.arc(x+3,y,2,0,2*Math.PI);
+		context.fillStyle = eyes;
+		context.fill();
+		context.closePath();
+		//left eye
+		context.arc(x-3,y,2,0,2*Math.PI);
+		context.fill();
+		context.closePath();
+	} else {
+		//upper eye
+		context.beginPath()
+		context.arc(x,y-3,2,0,2*Math.PI);
+		context.fillStyle = eyes;
+		context.fill();
+		context.closePath();
+		//lower eye
+		context.arc(x,y+3,2,0,2*Math.PI);
+		context.fill();
+		context.closePath();
+	}
+}
+
+function draw_fullhead(context,x,y,direction="n",radius = 8, outline = "green",fill = "green", eyes= "black"){
+	context.beginPath();
+	context.arc(x, y, radius, 0, 2*Math.PI);
+	context.fillStyle = fill;
+	context.fill();
+	context.lineWidth = 1;
+	context.strokeStyle = outline;
+	context.stroke();
+	context.closePath()
+	if (direction == "n" || direction == "s"){
+		//right eye
+		context.beginPath()
+		context.arc(x+5,y,2,0,2*Math.PI);
+		context.fillStyle = eyes;
+		context.fill();
+		context.strokeStyle = "white";
+		context.lineWidth = 1;
+		context.stroke();
+		context.closePath();
+		//left eye
+		context.beginPath()
+		context.arc(x-5,y,2,0,2*Math.PI);
+		context.fill();
+		context.stroke()
+		context.closePath();
+	} else {
+		//upper eye
+		context.beginPath();
+		context.arc(x,y-6,3,0,2*Math.PI);
+		context.fillStyle = eyes;
+		context.fill();
+		context.strokeStyle = "white";
+		context.lineWidth = 1;
+		context.stroke();
+		context.closePath();
+		//lower eye
+		context.beginPath();
+		context.arc(x,y+6,3,0,2*Math.PI);
+		context.fill();
+		context.stroke();
+		context.closePath();
+	}
+}
+
+function mouse(context, x, y){
+	context.beginPath();
+	context.arc(x, y, 6, 0, 2*Math.PI);
+	context.fillStyle = "Silver";
+	context.fill();
+	context.lineWidth = 1;
+	context.strokeStyle = "Silver";
+	context.stroke();
+	context.closePath()
+	//right eye
+	context.beginPath()
+	context.arc(x+3,y+1,1,0,2*Math.PI);
+	context.fillStyle = "Black";
+	context.fill();
+	context.strokeStyle = "Black";
+	context.lineWidth = 1;
+	context.stroke();
+	context.closePath();
+	//left eye
+	context.beginPath()
+	context.arc(x-3,y+1,1,0,2*Math.PI);
+	context.fill();
+	context.stroke()
+	context.closePath();
+	//tail
+	context.beginPath();
+	context.strokeStyle = "Silver";
+	context.arc(x-6,y-6,6,60,0.2);
+	context.stroke();
+	context.closePath()
+}
+
+function display_score(context, score, level, width){
+	context.font = "20px Courier";
+	context.fillStyle = "white";
+	context.fillText("Level: "+level, 25 ,27);
+	context.fillText("Poos: " +score, Math.floor(width/2)+25 ,27);
+}
+
+function display_error(context, error = "error"){
+	context.font = "20px Courier";
+	context.fillStyle = "white";
+	context.fillText(error, 100 ,110);
+}
+
+function clear_score(){
+	ctx.clearRect(0,0, Math.floor(width/2) - 1, 49);
+	ctx.clearRect(Math.floor(width/2)+1,0, Math.floor(width/2) - 1, 49);
+}
+
+function clear_screen(){
+	ctx.clearRect(0,top_boarder,width, height);
+}
+
+function draw_poo(context,poosize, x, y){
+	context.beginPath();
+	context.arc(x-2, y+2,poosize , 0, 2*Math.PI);
+	context.arc(x, y-2,poosize , 0, 2*Math.PI);
+	context.arc(x+2, y+2,poosize , 0, 2*Math.PI);
+	context.fillStyle = "#663D00";
+	context.fill();
+	context.strokeStyle = "#663D00";
+	context.stroke();
+	context.closePath();
+}
+
+
+function draw_food(){
+	if (food_drawing == "mouse"){
+		mouse(ctx, food_position.x,food_position.y);
+	} else if (food_drawing == "full_head"){
+		draw_fullhead(ctx, food_position.x, food_position.y, direction);
+	} else if (food_drawing == "full_body"){
+		draw_circle(ctx, food_position.x, food_position.y, 6)
+	}
+}
+
+
+function move_snake(head, body, direction, dx, dy, width, height, top_boarder){
+	let new_segment = JSON.parse(JSON.stringify(head));
+	body.push(new_segment);
+	body.shift();
+	if (direction == "w"){
+		head.x = head.x - dx;
+		if (head.x < 10){
+			head.x = width-10 ;
+		}
+	} else if (direction == "e") {
+		head.x = head.x + dx
+		if (head.x > width-10){
+			head.x = 10;
+		}
+	} else if (direction == "s") {
+		head.y = head.y + dy
+		if (head.y > height - 10){
+			head.y = top_boarder+10;
+		}
+	} else if (direction == "n") {
+		head.y = head.y - dy
+		if (head.y < top_boarder+10){
+			head.y = height - 10;
+		}
+	}
+}
+
+
+function draw_body(ctx, body, clr = "green"){
+	for (var i = 0; i < body.length; i++){
+		draw_circle(ctx, body[i].x, body[i].y, radius = bodysize_empty,outline = clr, fill = clr)
+	}
+}
+
+function rand_y(height, top_boarder){
+	var max = height - 10;
+	var min = top_boarder + 10;
+	return (Math.round((Math.random()*(max - min) + min) /10 )) * 10;	
+}
+
+function rand_x(width){
+	var min = 10;
+	var max = width - 10;
+	return (Math.round((Math.random()*(max - min) + min) /10 )) * 10;
+}
+
+var key_direction = {37:"w", 38:"n", 39:"e", 40:"s"};
+var again = false 
+
+function keydown_yesno(event){
+	var key_yn = event.keyCode;
+	if (key_yn == 13){
+		again = true;
+	}
+}
+
+
+
+function keydown(event){
+	var legal = [37,38,39,40];
+	var key = event.keyCode;
+	if (legal.includes(key)){
+		new_direction = key_direction[key];
+		if (direction == "s" || direction == "n"){
+			if (new_direction == "s" || new_direction == "n"){
+				null;
+			} else {
+				direction = new_direction;
+			}
+		} else if (direction == "w" || direction == "e") {
+			if (new_direction == "w" || new_direction == "e"){
+				null;
+			} else {
+				direction = new_direction;
+			}
+		}
+	}
+
+}
+
+
+
+function is_position_same(coord_obj1, coord_obj2){
+	if (coord_obj1.x == coord_obj2.x && coord_obj1.y == coord_obj2.y){
+		return true;
+	} else {
+		return false; 
+	}
+}
+
+function is_coord_in_list(item, list){
+	var isin = false
+	for (var i = 0; i < list.length; i++){
+		if (is_position_same(item, list[i])){
+			isin = true; break; 
+		}
+	}
+	return isin;
+}
+
+function collision(){
+	var headInBody = is_coord_in_list(head, body); 
+	var foodInBody = is_coord_in_list(food_position, body);
+	var headInPoos = is_coord_in_list(head, poos);
+	var headInFood = is_position_same(food_position, head);
+
+	score_add = false; dead = "not";
+	if (headInBody) {
+		dead = "body"; food_drawing = "mouse"; food_state = "uneaten";
+	} else if (headInPoos && !(headInFood)){
+		dead = "poo"; food_drawing = "mouse"; food_state = "uneaten";
+	} else if (headInFood && food_state == "uneaten"){
+		food_state = "digesting"; score_add = true;
+		food_drawing = "full_head";
+	} else if (foodInBody == true && food_state == "digesting"){
+		food_drawing = "full_body";
+	} else if (food_state == "digesting" && foodInBody == false){
+		let new_dump = JSON.parse(JSON.stringify(food_position));
+		poos.push(new_dump);
+		let new_body_segment = JSON.parse(JSON.stringify(food_position));
+		body.unshift(new_body_segment)
+		food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
+		food_state = "uneaten";
+		food_drawing = "mouse";
+	} else {
+		food_drawing = "mouse"; food_state = "uneaten";
+	}
+}
+
+var game_paused = false;
+
+function level_up(){
+	var lvl_a = "LVL UP LVL UP LVL UP LVL";
+	var y_pos = top_boarder + 20;
+	game_paused = true;
+	var lvlupId = window.setInterval(function lvl_animate(){
+		ctx.font = "20px Courier";
+		if (level <= 3){
+			lvl_a = "NOT BAD LEVEL UP NOT BAD";
+			ctx.fillStyle = "green";
+		} else if (level > 3 && level <= 6){
+			lvl_a = "LVL WHAT DID YOU EAT LVL"
+			ctx.fillStyle = "yellow";
+		} else if (level > 6 && level <= 9){
+			lvl_a = "!! YOU'R IN DEEP SHIT !!"
+			ctx.fillStyle = "red";
+		} else {
+			lvl_a = "LVL ITS A SHIT FEST LVL"
+			ctx.fillStyle = "white";
+		}
+		ctx.fillText(lvl_a, 5 ,y_pos);	
+		ctx.clearRect(45,118,220, 52);
+		ctx.font = "40px Courier";
+		ctx.fillText("LEVEL " + level, 80, 160);
+		y_pos = y_pos + 20;
+		if (y_pos > height) {
+			game_paused = false;
+			window.clearInterval(lvlupId);
+		}
+	}, 70)
+}
+
+
+function draw_all_poos(){
+	for (var i = 0; i < poos.length; i++){
+		draw_poo(ctx,poosize,poos[i].x, poos[i].y)
+	}
+}
+
+var player_index = null;
+var leaderboard = null;
+var top10 = [];
+var PlayerRank = 0;
+var delete_list = [];
+var ScoreCount = 0;
+
+function death_screen(){
+
+		//////  LEADERBOARD ////////
+		PlayerName = document.getElementById("username").value
+
+		if (PlayerName == "Enter Name"){
+			PlayerName = "Anon";
+		};
+
+		player_index = playersRef.push({
+			P_name: PlayerName,
+			P_score: score,
+		});
+
+		
+		// GET TOP 10 SCORES 
+		top10 = [];
+		playersRef.orderByChild("P_score").limitToLast(10).once("value", function(snapshot){
+		
+		snapshot.forEach(function(data) {
+			//console.log(data.key, data.val().P_score, data.val().P_name)
+			top10.unshift({name:data.val().P_name, score:data.val().P_score})
+			})
+		});
+
+		// FIND USERS RANK
+		playersRef.orderByChild("P_score").once("value", function(snapshot){
+		PlayerRank = 0;
+			snapshot.forEach(function(data) {
+				if (data.val().P_score > score){
+					PlayerRank = PlayerRank + 1;
+				} 
+			})
+			console.log(PlayerRank)
+		})
+
+		// DELETE ECESS ENTRIES ON LEADERBOARD 
+		playersRef.orderByChild("P_score").once("value", function(snapshot){
+		ScoreCount = 0;
+			snapshot.forEach(function(data) {
+				ScoreCount = ScoreCount + 1;
+				if (ScoreCount < 1000) {
+					delete_list.push(data.key)
+				}
+			})	
+		})
+
+		console.log(delete_list)
+		for (var i = 0; i < delete_list.length; i++){
+			playersRef.child(delete_list[i]).remove()
+		}
+
+
+        //////////
+
+		game_paused=true;
+		var death_id = window.setInterval(function print_death(){
+			document.addEventListener("keydown", keydown_yesno, {once:true});
+
+		
+			clear_screen();
+			ctx.font = "16px Courier";
+			draw_head(ctx,head.x,head.y, direction, radius = 6, outline = "gray", fill = "gray");
+			draw_body(ctx, body, clr = "gray");
+			ctx.fillStyle = "lime";
+			if (dead == "poo"){
+				ctx.fillText("you took " + score + " dumps!", 10, 70);
+				ctx.fillText("Snake ate a poo, then died", 10, 100);
+
+				ctx.font = "14px Arial";
+				ctx.fillStyle = "red";
+				ctx.fillText("TOP 10", 100, 120);
+				list_placement = 135
+				for (var i = 0; i < top10.length; i++){
+					ctx.fillText(top10[i].name, 20, list_placement);
+					ctx.fillText(top10[i].score, 170, list_placement);
+					list_placement = list_placement + 15;
+				};
+
+				var corrected_rank = PlayerRank + 1;
+				ctx.font = "16px Courier";
+				ctx.fillStyle = "lime";
+
+				if (corrected_rank < 1000){
+					ctx.fillText("Your poo rank is " + corrected_rank , 10, 300);
+				} else {
+					ctx.fillText("you didnt make it to top 1000", 10, 300);
+				};
+
+				ctx.fillText("Play again?  [hit return]", 10, 330);
+	
+			} else if (dead == "body"){
+				ctx.fillText("you took " + score + " dumps!", 10, 70);
+				ctx.fillText("Snake ate its self", 10, 100);
+
+				ctx.font = "14px Arial";
+				ctx.fillStyle = "red";
+				ctx.fillText("TOP 10", 100, 120);
+				list_placement = 135
+				for (var i = 0; i < top10.length; i++){
+					ctx.fillText(top10[i].name, 20, list_placement);
+					ctx.fillText(top10[i].score, 170, list_placement);
+					list_placement = list_placement + 15;
+				};
+
+				var corrected_rank = PlayerRank + 1;
+				ctx.font = "16px Courier";
+				ctx.fillStyle = "lime";
+
+				if (corrected_rank < 1000){
+					ctx.fillText("Your poo rank is " + corrected_rank , 10, 300);
+				} else {
+					ctx.fillText("you didnt make it to top 1000", 10, 300);
+				};
+
+				ctx.fillText("Play again?  [hit return]", 10, 330);
+			}
+			if (again == true){
+				window.clearInterval(death_id)
+				start_screen();
+				//reset_game();		
+			}
+		},500)
+}
+
+function upclick(){
+	if (direction == "n" || direction == "s") {
+		null;
+	} else {
+		direction = "n";
+		udlr_button_clear_events();
+	}
+};
+
+function downclick(){
+	if (direction == "n" || direction == "s") {
+		null;
+	} else {
+		direction = "s";
+		udlr_button_clear_events();
+	}
+};
+
+function leftclick(){
+	if (direction == "w" || direction == "e") {
+		null;
+	} else {
+		direction = "w";
+		udlr_button_clear_events();
+	}
+};
+
+function rightclick(){
+	if (direction == "w" || direction == "e") {
+		null;
+	} else {
+		direction = "e";
+		udlr_button_clear_events();
+	}
+};
+
+function udlr_button_clear_events() {
+	up_button.removeEventListener("click", upclick);
+	down_button.removeEventListener("click", downclick);
+	left_button.removeEventListener("click", leftclick);
+	right_button.removeEventListener("click", rightclick);
+}
+
+
+
+function addButtonEvents(){
+	up_button.addEventListener("click", upclick);
+	down_button.addEventListener("click", downclick);
+	left_button.addEventListener("click", leftclick);
+	right_button.addEventListener("click", rightclick);
+}
+
+
+
+function keydown_start(event){
+	var key_yn = event.keyCode;
+	if (key_yn == 38){
+		start = true;
+	}
+}
+
+
+function up_start(){
+	start = true;
+};
+
+
+var start = false; 
+function start_screen(){
+		game_paused=true;
+		start = false;
+		var start_id = window.setInterval(function print_start(){
+			document.addEventListener("keydown", keydown_start, {once:true});
+			up_button.addEventListener("click", up_start, {once:true});
+			clear_screen();
+			ctx.font = "16px Courier";
+			ctx.fillStyle = "lime";
+				ctx.fillText("INSTRUCTIONS", 75, 70);
+				ctx.fillText("Enter PlayerName above", 10, 100);
+				ctx.fillText("PC: Use Keyboard Arrows keys", 10, 130);
+				ctx.fillText("Phone: use buttons below", 10, 160);
+				ctx.fillText("Begin?  [hit up button]", 10, 190);
+
+			if (start){
+				start = false; 
+				window.clearInterval(start_id)
+				reset_game();		
+			}
+		},50)
+}
+
+
+
+
+function main(){
+	
+	intervalId = window.setTimeout( 
+	function game() {
+		
+		if (!game_paused){
+
+			username = document.getElementById("gameWindow");
+
+			move_snake(head, body, direction, dx, dy, width, height,header_size = top_boarder);
+			collision();
+			document.addEventListener("keydown", keydown, {once:true});
+			addButtonEvents();
+			clear_screen();
+			clear_score();
+			draw_boarder(ctx, width, top_boarder);
+			display_score(ctx, score, level, width);
+			draw_head(ctx,head.x,head.y, direction);
+			draw_body(ctx, body, clr = "green");
+			draw_all_poos();
+			draw_food();
+		}
+		if (score_add){
+			score = score + 1;
+		}
+		if (poos.length > (level * 2)) {  // possibly move this before drawing ..
+			poos = [];
+			level = level + 1;
+			level_up();
+			speed = speed * 0.8;
+			main();
+		} else if (dead == "not"){
+			main();
+		} else if (dead == "body") {
+			death_screen();
+		} else if (dead == "poo") {
+			death_screen();
+		}
+	}, speed);
+}
+//////////////////////////////////////////////////////////////////////////////////////
+
+var new_segment = null 
+var head = {x:50, y: 250};
+var body = [{x:40, y:250}];
+var poos = [];
+//var food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
+var food_position = {x:250, y:250};
+var food_state = "uneaten";
+var dx = 10;
+var dy = 10;
+var score = 0;
+var level = 1;
+var game_paused = false;
+var direction = "e";
+var speed = 250;
+var score_add = false;
+var dead = "not";
+var food_drawing = "mouse"
+var again = false;
+
+
+// MAIN GAME //
+
+function reset_game(){
+
+
+
+
+	new_segment = null 
+	head = {x:50, y: 250};
+	body = [{x:40, y:250}];
+	poos = [];
+	food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
+	//food_position = {x:250, y:250};
+	food_state = "uneaten";
+	dx = 10;
+	dy = 10;
+	score = 0;
+	game_paused = false;
+	level = 1;
+	direction = "e";
+	speed = 250;
+	score_add = false;
+	dead = "not";
+	food_drawing = "mouse"
+	again = false;
+	main();
+}
+
+start_screen();
+//reset_game();
+//main();
+
+
