@@ -42,6 +42,7 @@ var dead = "not";
 var food_drawing = "mouse"
 var again = false;
 var eatPulse = 0; // frames remaining for head/body pulse when eating
+var pendingDirection = null; // store one input between ticks to avoid 180° reversals
 
 
 
@@ -323,18 +324,15 @@ function keydown(event){
 	var key = event.keyCode;
 	if (legal.includes(key)){
 		let new_direction = key_direction[key];
-		if (direction == "s" || direction == "n"){
-			if (new_direction == "s" || new_direction == "n"){
-				null;
-			} else {
-				direction = new_direction;
-			}
-		} else if (direction == "w" || direction == "e") {
-			if (new_direction == "w" || new_direction == "e"){
-				null;
-			} else {
-				direction = new_direction;
-			}
+		// ignore if trying to reverse 180 degrees
+		if ((direction == "n" && new_direction == "s") || (direction == "s" && new_direction == "n") ||
+			(direction == "w" && new_direction == "e") || (direction == "e" && new_direction == "w")){
+			return;
+		}
+		// only queue one pending direction per tick
+		if (!pendingDirection){
+			// disallow changing to a direction on the same axis (e.g. n->s) handled above
+			pendingDirection = new_direction;
 		}
 	}
 
@@ -463,7 +461,12 @@ function main(){
 	function game() {
 		
 		if (!game_paused){
-			move_snake(head, body, direction, dx, dy, width, height,header_size = top_boarder);
+				// apply any queued direction change once per tick
+				if (pendingDirection){
+					direction = pendingDirection;
+					pendingDirection = null;
+				}
+				move_snake(head, body, direction, dx, dy, width, height,header_size = top_boarder);
 			collision();
 			document.addEventListener("keydown", keydown, {once:true});
 			clear_screen();
@@ -634,7 +637,9 @@ function handlePointerForDirection(clientX, clientY){
 		(direction == "w" && newDir == "e") || (direction == "e" && newDir == "w")){
 		return; // ignore
 	}
-	direction = newDir;
+	if (!pendingDirection){
+		pendingDirection = newDir;
+	}
 }
 
 // Pointer event handlers
