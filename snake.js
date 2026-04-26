@@ -9,10 +9,17 @@ var canvas = document.getElementById("gameWindow");
 var ctx = canvas.getContext("2d");
 var bodysize_full = 10;
 var bodysize_empty = 4;
-var poosize = 2;
-var width = 300;
-var height = 350;
+var poosize = 3; // increased for visibility
+// logical game dimensions (grid based on 10px units)
+var logicalWidth = 300;
+var logicalHeight = 350;
+var width = logicalWidth;
+var height = logicalHeight;
 var top_boarder = 50;
+
+// track current device pixel ratio scaling so we can redraw correctly
+var DPR = window.devicePixelRatio || 1;
+var intervalId = null;
 
 
 
@@ -34,6 +41,7 @@ var score_add = false;
 var dead = "not";
 var food_drawing = "mouse"
 var again = false;
+var eatPulse = 0; // frames remaining for head/body pulse when eating
 
 
 
@@ -69,8 +77,13 @@ function draw_circle(context,x,y,radius = 4, outline = "green",fill = "green"){
 
 
 function draw_head(context,x,y,direction,radius = 6, outline = "green" ,fill = "green", eyes = "black"){
+	// apply eat pulse scaling
+	var scale = 1 + (eatPulse > 0 ? 0.18 * (eatPulse/6) : 0);
+	context.save();
+	context.translate(x, y);
+	context.scale(scale, scale);
 	context.beginPath();
-	context.arc(x, y, radius, 0, 2*Math.PI);
+	context.arc(0, 0, radius, 0, 2*Math.PI);
 	context.fillStyle = fill;
 	context.fill();
 	context.lineWidth = 1;
@@ -80,26 +93,29 @@ function draw_head(context,x,y,direction,radius = 6, outline = "green" ,fill = "
 	if (direction == "n" || direction == "s"){
 		//right eye
 		context.beginPath()
-		context.arc(x+3,y,2,0,2*Math.PI);
+		context.arc(3,0,2,0,2*Math.PI);
 		context.fillStyle = eyes;
 		context.fill();
 		context.closePath();
 		//left eye
-		context.arc(x-3,y,2,0,2*Math.PI);
+		context.beginPath();
+		context.arc(-3,0,2,0,2*Math.PI);
 		context.fill();
 		context.closePath();
 	} else {
 		//upper eye
 		context.beginPath()
-		context.arc(x,y-3,2,0,2*Math.PI);
+		context.arc(0,-3,2,0,2*Math.PI);
 		context.fillStyle = eyes;
 		context.fill();
 		context.closePath();
 		//lower eye
-		context.arc(x,y+3,2,0,2*Math.PI);
+		context.beginPath();
+		context.arc(0,3,2,0,2*Math.PI);
 		context.fill();
 		context.closePath();
 	}
+	context.restore();
 }
 
 function draw_fullhead(context,x,y,direction="n",radius = 8, outline = "green",fill = "green", eyes= "black"){
@@ -201,14 +217,31 @@ function clear_screen(){
 }
 
 function draw_poo(context,poosize, x, y){
+	// lighter, higher-contrast poo with clearer highlight
+	// shadow
 	context.beginPath();
+	context.fillStyle = 'rgba(0,0,0,0.18)';
+	context.ellipse(x, y+poosize+2, poosize+3, poosize/1.6, 0, 0, 2*Math.PI);
+	context.fill();
+	context.closePath();
+
+	// main blobs (lighter brown)
+	context.beginPath();
+	context.fillStyle = '#8B5E2B';
+	context.strokeStyle = '#6f4a1f';
+	context.lineWidth = 1;
 	context.arc(x-2, y+2,poosize , 0, 2*Math.PI);
 	context.arc(x, y-2,poosize , 0, 2*Math.PI);
 	context.arc(x+2, y+2,poosize , 0, 2*Math.PI);
-	context.fillStyle = "#663D00";
 	context.fill();
-	context.strokeStyle = "#663D00";
 	context.stroke();
+	context.closePath();
+
+	// small bright highlight for readability
+	context.beginPath();
+	context.fillStyle = 'rgba(255,255,200,0.35)';
+	context.arc(x-1, y-3, Math.max(1, poosize/1.4), 0, Math.PI*2);
+	context.fill();
 	context.closePath();
 }
 
@@ -254,7 +287,13 @@ function move_snake(head, body, direction, dx, dy, width, height, top_boarder){
 
 function draw_body(ctx, body, clr = "green"){
 	for (var i = 0; i < body.length; i++){
-		draw_circle(ctx, body[i].x, body[i].y, radius = bodysize_empty,outline = clr, fill = clr)
+		// if eatPulse active, slightly enlarge the head-adjacent body segment for a short time
+		if (eatPulse > 0 && i == body.length - 1){
+			// draw a slightly larger circle for the newly added segment
+			draw_circle(ctx, body[i].x, body[i].y, radius = bodysize_empty + 2, outline = clr, fill = clr)
+		} else {
+			draw_circle(ctx, body[i].x, body[i].y, radius = bodysize_empty,outline = clr, fill = clr)
+		}
 	}
 }
 
@@ -271,7 +310,6 @@ function rand_x(width){
 }
 
 var key_direction = {37:"w", 38:"n", 39:"e", 40:"s"};
-var again = false 
 
 function keydown_yesno(event){
 	var key_yn = event.keyCode;
@@ -284,7 +322,7 @@ function keydown(event){
 	var legal = [37,38,39,40];
 	var key = event.keyCode;
 	if (legal.includes(key)){
-		new_direction = key_direction[key];
+		let new_direction = key_direction[key];
 		if (direction == "s" || direction == "n"){
 			if (new_direction == "s" || new_direction == "n"){
 				null;
@@ -336,6 +374,8 @@ function collision(){
 	} else if (headInFood && food_state == "uneaten"){
 		food_state = "digesting"; score_add = true;
 		food_drawing = "full_head";
+		// trigger a short pulse animation for head/body
+		eatPulse = 6; // a few frames of pulse
 	} else if (foodInBody == true && food_state == "digesting"){
 		food_drawing = "full_body";
 	} else if (food_state == "digesting" && foodInBody == false){
@@ -351,7 +391,6 @@ function collision(){
 	}
 }
 
-var game_paused = false;
 
 
 function level_up(){
@@ -419,7 +458,7 @@ function death_screen(){
 }
 
 function main(){
-	
+    
 	intervalId = window.setTimeout( 
 	function game() {
 		
@@ -436,6 +475,9 @@ function main(){
 			draw_all_poos();
 			draw_food();
 		}
+
+		// decrement eat pulse if active
+		if (eatPulse > 0) eatPulse = Math.max(0, eatPulse - 1);
 		if (score_add){
 			score = score + 1;
 		}
@@ -486,5 +528,156 @@ function reset_game(){
 
 reset_game();
 //main();
+
+
+
+// ---------------- Responsive canvas and mobile controls ----------------
+
+function fitCanvasToWindow(){
+	// Make the canvas fill the available width (as defined by CSS) while preserving the game's logical aspect ratio.
+	// We'll set the canvas CSS width already handled by style; set the internal pixel size for crisp rendering.
+	DPR = window.devicePixelRatio || 1;
+	// compute CSS width of canvas as laid out (fallback to logicalWidth)
+	var cssWidth = canvas.clientWidth || logicalWidth;
+	// compute corresponding CSS height using logical aspect ratio
+	var aspect = logicalHeight / logicalWidth;
+	var cssHeight = Math.round(cssWidth * aspect);
+
+	// set canvas display size in CSS pixels
+	canvas.style.width = cssWidth + 'px';
+	canvas.style.height = cssHeight + 'px';
+
+	// set actual canvas pixel size for high-DPI
+	canvas.width = Math.round(cssWidth * DPR);
+	canvas.height = Math.round(cssHeight * DPR);
+
+	// compute scale factor that maps game logical units to canvas internal pixels
+	// factor = (cssWidth / logicalWidth) * DPR = canvas.width / logicalWidth
+	var scaleFactor = canvas.width / logicalWidth;
+	// set transform so that all subsequent drawing uses logical game coordinates
+	ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
+
+	// update game width/height to logical values (we keep original game coordinate system)
+	width = logicalWidth;
+	height = logicalHeight;
+
+	// redraw once
+	clear_screen();
+	draw_boarder(ctx, width, top_boarder);
+	display_score(ctx, score, level, width);
+	draw_head(ctx,head.x,head.y, direction);
+	draw_body(ctx, body, clr = "green");
+	draw_all_poos();
+	draw_food();
+}
+
+// touch/click visual feedback: draw a transient translucent circle at the tapped logical position
+function showTouchFeedback(clientX, clientY){
+	var rect = canvas.getBoundingClientRect();
+	var x_css = clientX - rect.left;
+	var y_css = clientY - rect.top;
+	var cssW = rect.width;
+	var cssH = rect.height;
+	// map CSS coords to logical game coords
+	var lx = (x_css / cssW) * logicalWidth;
+	var ly = (y_css / cssH) * logicalHeight;
+
+	// draw feedback circle
+	// Save and restore state to avoid interfering with other drawing
+	ctx.save();
+	ctx.globalAlpha = 0.9;
+	ctx.fillStyle = 'rgba(200,200,255,0.6)';
+	// radius in logical units (choose ~18 logical px scaled)
+	var r = 18;
+	ctx.beginPath();
+	ctx.arc(lx, ly, r, 0, 2*Math.PI);
+	ctx.fill();
+	ctx.restore();
+
+	// clear the feedback after a short time by redrawing the full scene
+	setTimeout(function(){
+		clear_screen();
+		draw_boarder(ctx, width, top_boarder);
+		display_score(ctx, score, level, width);
+		draw_head(ctx,head.x,head.y, direction);
+		draw_body(ctx, body, clr = "green");
+		draw_all_poos();
+		draw_food();
+	}, 180);
+}
+
+// Map a tap/click point (in client coordinates) to a direction change, following the rule:
+// - If current movement is left/right (w/e) then tapping top half -> up (n), bottom half -> down (s)
+// - If current movement is up/down (n/s) then tapping left half -> left (w), right half -> right (e)
+// Also accept taps that are roughly near the edges to enable quick turns.
+function handlePointerForDirection(clientX, clientY){
+	var rect = canvas.getBoundingClientRect();
+	var x = clientX - rect.left; // css pixels
+	var y = clientY - rect.top; // css pixels
+	var cssW = rect.width;
+	var cssH = rect.height;
+
+	// Decide new direction based on current direction
+	var newDir = direction;
+	if (direction == "w" || direction == "e"){
+		// moving horizontally: tap top/bottom to go vertically
+		if (y < cssH/2) newDir = "n";
+		else newDir = "s";
+	} else if (direction == "n" || direction == "s"){
+		// moving vertically: tap left/right to go horizontally
+		if (x < cssW/2) newDir = "w";
+		else newDir = "e";
+	}
+
+	// Prevent 180 degree reversal
+	if ((direction == "n" && newDir == "s") || (direction == "s" && newDir == "n") ||
+		(direction == "w" && newDir == "e") || (direction == "e" && newDir == "w")){
+		return; // ignore
+	}
+	direction = newDir;
+}
+
+// Pointer event handlers
+function onCanvasClick(e){
+	// Support both mouse click and touchend events
+	var clientX, clientY;
+	if (e.changedTouches && e.changedTouches.length > 0){
+		clientX = e.changedTouches[0].clientX;
+		clientY = e.changedTouches[0].clientY;
+	} else {
+		clientX = e.clientX;
+		clientY = e.clientY;
+	}
+	// show visual feedback at tap location
+	showTouchFeedback(clientX, clientY);
+	handlePointerForDirection(clientX, clientY);
+}
+
+// Add listeners
+canvas.addEventListener('click', onCanvasClick);
+canvas.addEventListener('touchend', function(e){ e.preventDefault(); onCanvasClick(e); }, {passive:false});
+
+// Refit canvas on resize or orientation change
+window.addEventListener('resize', function(){
+	// small debounce
+	clearTimeout(window._fitCanvasTimeout);
+	window._fitCanvasTimeout = setTimeout(function(){
+		fitCanvasToWindow();
+	}, 120);
+});
+
+// initial fit
+fitCanvasToWindow();
+
+// Instructions toggle wiring
+window.addEventListener('load', function(){
+	var infoBtn = document.getElementById('infoBtn');
+	var instr = document.getElementById('instructions');
+	if (infoBtn && instr){
+		infoBtn.addEventListener('click', function(){
+			instr.classList.toggle('hidden');
+		});
+	}
+});
 
 

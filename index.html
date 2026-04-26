@@ -3,14 +3,29 @@
 <html lang="en">
 
     <head>
-        <title id="t1">Poo-Snake</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title id="t1">POO SNAKE — snake number 2!</title>
         <link rel = "stylesheet" href ="style.css">
     </head>
 
     <body style="background-color:black;">
 
-        <h1 title="The real snake number 2"><b style="color:saddlebrown;">POO </b><b>SNAKE</b></h1>
-        <canvas id="gameWindow" width="300" height="350"></canvas>
+        <div class="title-row">
+            <h1 title="The real snake number 2"><b style="color:saddlebrown;">POO </b><b>SNAKE</b></h1>
+            <div class="subtitle">snake number 2!</div>
+            <button id="infoBtn" class="info-icon" aria-label="Instructions">i</button>
+        </div>
+        <div id="instructions" class="instructions hidden">
+            <p>Controls:</p>
+            <ul>
+                <li>Mobile: tap the top/bottom half to go up/down while moving left/right.</li>
+                <li>Tap left/right half to go left/right while moving up/down.</li>
+                <li>Keyboard arrow keys also work on desktop.</li>
+            </ul>
+            <p>Tip: avoid your own tail and the poos. Good luck!</p>
+        </div>
+        <canvas id="gameWindow"></canvas>
+        <p class="controls-hint">Tap the canvas to control the snake. Keyboard arrows work too.</p>
         <script src="snake.js"></script>
 
     </body>

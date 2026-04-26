@@ -8,14 +8,78 @@ h1 {
 	text-align: center;
 }
 
+
+.subtitle{
+	text-align: center;
+	font-size: 12px;
+	color: #7CFC00; /* neon green */
+	font-family: courier, monospace;
+	margin-top: 0.1rem;
+	margin-bottom: 0.3rem;
+}
+
+.title-row h1{
+	margin: 0.1rem 0 0;
+}
+
+.title-row {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+}
+
+.info-icon {
+	position: fixed;
+	right: 12px;
+	top: 8px;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	border: none;
+	background: rgba(255,255,255,0.06);
+	color: #ddd;
+	font-weight: bold;
+	cursor: pointer;
+	z-index: 1000;
+}
+
+.instructions{
+	max-width: 420px;
+	margin: 0.2rem auto;
+	background: rgba(30,30,30,0.9);
+	color: #ddd;
+	padding: 0.6rem;
+	border-radius: 8px;
+	font-family: courier, monospace;
+	font-size: 13px;
+	border: 1px solid #444;
+}
+
+.instructions.hidden{ display: none; }
+
 canvas {
 	background: black;
 	display: block;
-	margin: 0 auto;
+	margin: 0.4rem auto;
 	border: solid;
 	border-width: 2px;
 	border-color: silver;
-	border-radius: 10px
+	border-radius: 10px;
+	/* Responsive sizing: width fills small screens, max-width to keep layout reasonable */
+	width: calc(100vw - 2rem);
+	max-width: 420px;
+	height: auto; /* will be set by JS to preserve pixel ratio */
+	touch-action: manipulation; /* improve touch responsiveness */
+}
+
+.controls-hint {
+	color: #ccc;
+	font-family: courier, monospace;
+	text-align: center;
+	font-size: 12px;
+	margin: 0.2rem auto 0.8rem;
 }
 
 	
