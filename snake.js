@@ -7,6 +7,7 @@
 
 var canvas = document.getElementById("gameWindow");
 var ctx = canvas.getContext("2d");
+var retryButton = document.getElementById("retryBtn");
 var bodysize_full = 10;
 var bodysize_empty = 4;
 var poosize = 3; // increased for visibility
@@ -43,6 +44,19 @@ var food_drawing = "mouse"
 var again = false;
 var eatPulse = 0; // frames remaining for head/body pulse when eating
 var pendingDirection = null; // store one input between ticks to avoid 180° reversals
+var magicChance = 1 / 10;
+var magicDuration = 5000;
+var magicTypes = {
+	yellow: {color: "#ffd83d", glow: "rgba(255, 216, 61, 0.45)", glowRgb: "255, 216, 61"},
+	green: {color: "#40ff6a", glow: "rgba(64, 255, 106, 0.45)", glowRgb: "64, 255, 106"},
+	white: {color: "#ffffff", glow: "rgba(255, 255, 255, 0.5)", glowRgb: "255, 255, 255"},
+	blue: {color: "#35a7ff", glow: "rgba(53, 167, 255, 0.45)", glowRgb: "53, 167, 255"}
+};
+var magicTypeNames = Object.keys(magicTypes);
+var godMode = false;
+var pooShield = false;
+var poosMadeThisLevel = 0;
+var deathIntervalId = null;
 
 
 
@@ -217,7 +231,28 @@ function clear_screen(){
 	ctx.clearRect(0,top_boarder,width, height);
 }
 
-function draw_poo(context,poosize, x, y){
+function draw_poo(context,poosize, x, y, magicType){
+	var magic = magicType ? magicTypes[magicType] : null;
+	if (magic){
+		var pulse = (Math.sin(Date.now() / 220) + 1) / 2;
+		var glowRadius = poosize + 8 + (pulse * 4);
+		var glowAlpha = 0.11 + (pulse * 0.12);
+		context.save();
+		context.shadowColor = magic.glow;
+		context.shadowBlur = 14 + (pulse * 8);
+		context.beginPath();
+		context.fillStyle = "rgba(" + magic.glowRgb + ", " + glowAlpha + ")";
+		context.arc(x, y, glowRadius, 0, 2*Math.PI);
+		context.fill();
+		context.closePath();
+		context.beginPath();
+		context.fillStyle = "rgba(" + magic.glowRgb + ", " + (glowAlpha * 0.55) + ")";
+		context.arc(x, y, glowRadius + 5, 0, 2*Math.PI);
+		context.fill();
+		context.closePath();
+		context.restore();
+	}
+
 	// lighter, higher-contrast poo with clearer highlight
 	// shadow
 	context.beginPath();
@@ -228,8 +263,8 @@ function draw_poo(context,poosize, x, y){
 
 	// main blobs (lighter brown)
 	context.beginPath();
-	context.fillStyle = '#8B5E2B';
-	context.strokeStyle = '#6f4a1f';
+	context.fillStyle = magic ? magic.color : '#8B5E2B';
+	context.strokeStyle = magic ? '#f7f7f7' : '#6f4a1f';
 	context.lineWidth = 1;
 	context.arc(x-2, y+2,poosize , 0, 2*Math.PI);
 	context.arc(x, y-2,poosize , 0, 2*Math.PI);
@@ -253,7 +288,8 @@ function draw_food(){
 	} else if (food_drawing == "full_head"){
 		draw_fullhead(ctx, food_position.x, food_position.y, direction);
 	} else if (food_drawing == "full_body"){
-		draw_circle(ctx, food_position.x, food_position.y, 6)
+		var snakeColor = get_snake_color();
+		draw_circle(ctx, food_position.x, food_position.y, 6, snakeColor, snakeColor)
 	}
 }
 
@@ -298,6 +334,16 @@ function draw_body(ctx, body, clr = "green"){
 	}
 }
 
+function get_snake_color(){
+	if (godMode){
+		return "white";
+	}
+	if (pooShield){
+		return "#8B5E2B";
+	}
+	return "green";
+}
+
 function rand_y(height, top_boarder){
 	var max = height - 10;
 	var min = top_boarder + 10;
@@ -311,13 +357,6 @@ function rand_x(width){
 }
 
 var key_direction = {37:"w", 38:"n", 39:"e", 40:"s"};
-
-function keydown_yesno(event){
-	var key_yn = event.keyCode;
-	if (key_yn == 32){
-		again = true;
-	}
-}
 
 function keydown(event){
 	var legal = [37,38,39,40];
@@ -358,17 +397,64 @@ function is_coord_in_list(item, list){
 	return isin;
 }
 
+function get_poo_index_at_position(position){
+	for (var i = 0; i < poos.length; i++){
+		if (is_position_same(position, poos[i])){
+			return i;
+		}
+	}
+	return -1;
+}
+
+function maybe_make_magic_poo(poo){
+	if (Math.random() < magicChance){
+		poo.magicType = magicTypeNames[Math.floor(Math.random() * magicTypeNames.length)];
+		poo.magicExpiresAt = Date.now() + magicDuration;
+	}
+	return poo;
+}
+
+function expire_magic_poos(){
+	var now = Date.now();
+	for (var i = 0; i < poos.length; i++){
+		if (poos[i].magicType && poos[i].magicExpiresAt <= now){
+			delete poos[i].magicType;
+			delete poos[i].magicExpiresAt;
+		}
+	}
+}
+
+function apply_magic_poo(type){
+	if (type == "yellow"){
+		speed = speed * 1.1;
+	} else if (type == "green"){
+		body = body.slice(Math.floor(body.length / 2));
+	} else if (type == "white"){
+		godMode = true;
+	} else if (type == "blue"){
+		pooShield = true;
+	}
+}
+
 
 function collision(){
-	var headInBody = is_coord_in_list(head, body); 
+	var headInBody = is_coord_in_list(head, body);
 	var foodInBody = is_coord_in_list(food_position, body);
-	var headInPoos = is_coord_in_list(head, poos);
+	var pooIndex = get_poo_index_at_position(head);
+	var headInPoos = pooIndex >= 0;
 	var headInFood = is_position_same(food_position, head);
 	score_add = false; dead = "not";
-	if (headInBody) {
+	if (headInPoos && poos[pooIndex].magicType && !(headInFood)){
+		apply_magic_poo(poos[pooIndex].magicType);
+		poos.splice(pooIndex, 1);
+		eatPulse = 6;
+	} else if (headInBody && !godMode) {
 		dead = "body"; food_drawing = "mouse"; food_state = "uneaten";
-	} else if (headInPoos && !(headInFood)){
+	} else if (headInPoos && !(headInFood) && !godMode && !pooShield){
 		dead = "poo"; food_drawing = "mouse"; food_state = "uneaten";
+	} else if (headInPoos && !(headInFood) && (godMode || pooShield)){
+		poos.splice(pooIndex, 1);
+		eatPulse = 6;
 	} else if (headInFood && food_state == "uneaten"){
 		food_state = "digesting"; score_add = true;
 		food_drawing = "full_head";
@@ -378,7 +464,8 @@ function collision(){
 		food_drawing = "full_body";
 	} else if (food_state == "digesting" && foodInBody == false){
 		let new_dump = JSON.parse(JSON.stringify(food_position));
-		poos.push(new_dump);
+		poos.push(maybe_make_magic_poo(new_dump));
+		poosMadeThisLevel = poosMadeThisLevel + 1;
 		let new_body_segment = JSON.parse(JSON.stringify(food_position));
 		body.unshift(new_body_segment)
 		food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
@@ -425,14 +512,33 @@ function level_up(){
 
 function draw_all_poos(){
 	for (var i = 0; i < poos.length; i++){
-		draw_poo(ctx,poosize,poos[i].x, poos[i].y)
+		draw_poo(ctx, poosize, poos[i].x, poos[i].y, poos[i].magicType)
+	}
+}
+
+function show_retry_button(){
+	if (retryButton){
+		retryButton.classList.remove("hidden");
+		retryButton.classList.add("is-visible");
+		retryButton.style.display = "block";
+	}
+}
+
+function hide_retry_button(){
+	if (retryButton){
+		retryButton.classList.remove("is-visible");
+		retryButton.classList.add("hidden");
+		retryButton.style.display = "none";
 	}
 }
 
 function death_screen(){
-		game_paused=true;
-	var death_id = window.setInterval(function print_death(){
-		document.addEventListener("keydown", keydown_yesno, {once:true});
+	if (deathIntervalId){
+		return;
+	}
+	game_paused=true;
+	show_retry_button();
+	deathIntervalId = window.setInterval(function print_death(){
 		clear_screen();
 		ctx.font = "16px Courier";
 		draw_head(ctx,head.x,head.y, direction, radius = 6, outline = "gray", fill = "gray");
@@ -441,40 +547,36 @@ function death_screen(){
 		if (dead == "poo"){
 			ctx.fillText("you took " + score + " dumps!", 10, 70);
 			ctx.fillText("Snake ate a poo, then died", 10, 100);
-			ctx.fillText("Play again?  [SPACE BAR]", 10, 130);
-	
+			ctx.fillText("Press Retry to play again", 10, 130);
+
 		} else if (dead == "body"){
 				ctx.fillText("you made " + score + " poos!", 10, 70);
 			ctx.fillText("Snake died from eating itself", 10, 100);
-			ctx.fillText("Play again? [SPACE BAR]", 10, 130);
-		}
-		if (again == true){
-			window.clearInterval(death_id)
-			reset_game();		
+			ctx.fillText("Press Retry to play again", 10, 130);
 		}
 	},50)
 }
 
 function main(){
-    
-	intervalId = window.setTimeout( 
+	intervalId = window.setTimeout(
 	function game() {
-		
 		if (!game_paused){
-				// apply any queued direction change once per tick
-				if (pendingDirection){
-					direction = pendingDirection;
-					pendingDirection = null;
-				}
-				move_snake(head, body, direction, dx, dy, width, height,header_size = top_boarder);
+			// apply any queued direction change once per tick
+			if (pendingDirection){
+				direction = pendingDirection;
+				pendingDirection = null;
+			}
+			expire_magic_poos();
+			move_snake(head, body, direction, dx, dy, width, height,header_size = top_boarder);
 			collision();
 			document.addEventListener("keydown", keydown, {once:true});
 			clear_screen();
 			clear_score();
 			draw_boarder(ctx, width, top_boarder);
 			display_score(ctx, score, level, width);
-			draw_head(ctx,head.x,head.y, direction);
-			draw_body(ctx, body, clr = "green");
+			var snakeColor = get_snake_color();
+			draw_head(ctx,head.x,head.y, direction, radius = 6, outline = snakeColor, fill = snakeColor);
+			draw_body(ctx, body, clr = snakeColor);
 			draw_all_poos();
 			draw_food();
 		}
@@ -484,8 +586,11 @@ function main(){
 		if (score_add){
 			score = score + 1;
 		}
-		if (poos.length > (level * 2)) {  // possibly move this before drawing ..
+		if (poosMadeThisLevel > (level * 2)) {  // possibly move this before drawing ..
 			poos = [];
+			poosMadeThisLevel = 0;
+			godMode = false;
+			pooShield = false;
 			level = level + 1;
 			level_up();
 			speed = speed * 0.8;
@@ -507,10 +612,16 @@ function main(){
 // MAIN GAME //
 
 function reset_game(){
-	new_segment = null 
+	if (deathIntervalId){
+		window.clearInterval(deathIntervalId);
+		deathIntervalId = null;
+	}
+	hide_retry_button();
+	new_segment = null
 	head = {x:50, y: 250};
 	body = [{x:40, y:250}];
 	poos = [];
+	poosMadeThisLevel = 0;
 	food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
 	//food_position = {x:250, y:250};
 	food_state = "uneaten";
@@ -525,6 +636,10 @@ function reset_game(){
 	dead = "not";
 	food_drawing = "mouse"
 	again = false;
+	eatPulse = 0;
+	pendingDirection = null;
+	godMode = false;
+	pooShield = false;
 	main();
 }
 
@@ -568,8 +683,9 @@ function fitCanvasToWindow(){
 	clear_screen();
 	draw_boarder(ctx, width, top_boarder);
 	display_score(ctx, score, level, width);
-	draw_head(ctx,head.x,head.y, direction);
-	draw_body(ctx, body, clr = "green");
+	var snakeColor = get_snake_color();
+	draw_head(ctx,head.x,head.y, direction, radius = 6, outline = snakeColor, fill = snakeColor);
+	draw_body(ctx, body, clr = snakeColor);
 	draw_all_poos();
 	draw_food();
 }
@@ -602,8 +718,9 @@ function showTouchFeedback(clientX, clientY){
 		clear_screen();
 		draw_boarder(ctx, width, top_boarder);
 		display_score(ctx, score, level, width);
-		draw_head(ctx,head.x,head.y, direction);
-		draw_body(ctx, body, clr = "green");
+		var snakeColor = get_snake_color();
+		draw_head(ctx,head.x,head.y, direction, radius = 6, outline = snakeColor, fill = snakeColor);
+		draw_body(ctx, body, clr = snakeColor);
 		draw_all_poos();
 		draw_food();
 	}, 180);
@@ -661,6 +778,15 @@ function onCanvasClick(e){
 // Add listeners
 canvas.addEventListener('click', onCanvasClick);
 canvas.addEventListener('touchend', function(e){ e.preventDefault(); onCanvasClick(e); }, {passive:false});
+if (retryButton){
+	retryButton.addEventListener('click', function(){
+		reset_game();
+	});
+	retryButton.addEventListener('touchend', function(e){
+		e.preventDefault();
+		reset_game();
+	});
+}
 
 // Refit canvas on resize or orientation change
 window.addEventListener('resize', function(){

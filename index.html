@@ -22,9 +22,19 @@
                 <li>Tap left/right half to go left/right while moving up/down.</li>
                 <li>Keyboard arrow keys also work on desktop.</li>
             </ul>
-            <p>Tip: avoid your own tail and the poos. Good luck!</p>
+            <p>Magic poos:</p>
+            <ul>
+                <li>Yellow slows you down.</li>
+                <li>Green halves your length.</li>
+                <li>White gives god mode until the next level.</li>
+                <li>Blue lets you eat poos until the next level.</li>
+            </ul>
+            <p>Glowing poos only stay magic for a few seconds.</p>
         </div>
-        <canvas id="gameWindow"></canvas>
+        <div class="game-wrap">
+            <canvas id="gameWindow"></canvas>
+            <button id="retryBtn" class="retry-button hidden" type="button">Retry</button>
+        </div>
         <p class="controls-hint">Tap the canvas to control the snake. Keyboard arrows work too.</p>
         <script src="snake.js"></script>
 
