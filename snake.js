@@ -57,6 +57,7 @@ var godMode = false;
 var pooShield = false;
 var poosMadeThisLevel = 0;
 var deathIntervalId = null;
+var highScoreStorageKey = "poosnakeHighScore";
 
 
 
@@ -220,6 +221,40 @@ function display_error(context, error = "error"){
 	context.font = "20px Courier";
 	context.fillStyle = "white";
 	context.fillText(error, 100 ,110);
+}
+
+function get_high_score(){
+	try {
+		var savedScore = parseInt(window.localStorage.getItem(highScoreStorageKey), 10);
+		return isNaN(savedScore) ? 0 : savedScore;
+	} catch (e) {
+		return 0;
+	}
+}
+
+function save_high_score(newScore){
+	try {
+		window.localStorage.setItem(highScoreStorageKey, String(newScore));
+	} catch (e) {}
+}
+
+function update_high_score(currentScore){
+	var highScore = get_high_score();
+	if (currentScore > highScore){
+		save_high_score(currentScore);
+		return currentScore;
+	}
+	return highScore;
+}
+
+function get_cause_of_death(){
+	if (dead == "poo"){
+		return "ate a poo";
+	}
+	if (dead == "body"){
+		return "ate itself";
+	}
+	return "unknown";
 }
 
 function clear_score(){
@@ -538,22 +573,20 @@ function death_screen(){
 	}
 	game_paused=true;
 	show_retry_button();
+	var finalScore = score;
+	var finalLevel = level;
+	var finalCause = get_cause_of_death();
+	var highScore = update_high_score(finalScore);
 	deathIntervalId = window.setInterval(function print_death(){
 		clear_screen();
 		ctx.font = "16px Courier";
 		draw_head(ctx,head.x,head.y, direction, radius = 6, outline = "gray", fill = "gray");
 		draw_body(ctx, body, clr = "gray");
 		ctx.fillStyle = "lime";
-		if (dead == "poo"){
-			ctx.fillText("you took " + score + " dumps!", 10, 70);
-			ctx.fillText("Snake ate a poo, then died", 10, 100);
-			ctx.fillText("Press Retry to play again", 10, 130);
-
-		} else if (dead == "body"){
-				ctx.fillText("you made " + score + " poos!", 10, 70);
-			ctx.fillText("Snake died from eating itself", 10, 100);
-			ctx.fillText("Press Retry to play again", 10, 130);
-		}
+		ctx.fillText("poos done: " + finalScore, 10, 70);
+		ctx.fillText("level: " + finalLevel, 10, 100);
+		ctx.fillText("cause of death: " + finalCause, 10, 130);
+		ctx.fillText("high score: " + highScore, 10, 160);
 	},50)
 }
 
