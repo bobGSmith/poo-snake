@@ -44,7 +44,7 @@ var food_drawing = "mouse"
 var again = false;
 var eatPulse = 0; // frames remaining for head/body pulse when eating
 var pendingDirection = null; // store one input between ticks to avoid 180° reversals
-var magicChance = 1 / 10;
+var magicChance = 1 / 2;
 var magicDuration = 5000;
 var magicTypes = {
 	yellow: {color: "#ffd83d", glow: "rgba(255, 216, 61, 0.45)", glowRgb: "255, 216, 61"},
@@ -54,10 +54,12 @@ var magicTypes = {
 };
 var magicTypeNames = Object.keys(magicTypes);
 var godMode = false;
-var pooShield = false;
 var poosMadeThisLevel = 0;
 var deathIntervalId = null;
 var highScoreStorageKey = "poosnakeHighScore";
+var petFly = null;
+var flySpeed = 275;
+var lastFlyMove = 0;
 
 
 
@@ -328,6 +330,34 @@ function draw_food(){
 	}
 }
 
+function draw_fly(context, fly){
+	if (!fly){
+		return;
+	}
+	var wingPulse = Math.sin(Date.now() / 80) * 1.5;
+	context.save();
+	context.beginPath();
+	context.fillStyle = "rgba(190, 230, 255, 0.75)";
+	context.ellipse(fly.x - 4, fly.y - 2, 4 + wingPulse, 2.5, -0.5, 0, 2*Math.PI);
+	context.ellipse(fly.x + 4, fly.y - 2, 4 - wingPulse, 2.5, 0.5, 0, 2*Math.PI);
+	context.fill();
+	context.closePath();
+
+	context.beginPath();
+	context.fillStyle = "#111";
+	context.arc(fly.x, fly.y, 3.5, 0, 2*Math.PI);
+	context.fill();
+	context.closePath();
+
+	context.beginPath();
+	context.fillStyle = "#e9f7ff";
+	context.arc(fly.x - 1.5, fly.y - 1.2, 1, 0, 2*Math.PI);
+	context.arc(fly.x + 1.5, fly.y - 1.2, 1, 0, 2*Math.PI);
+	context.fill();
+	context.closePath();
+	context.restore();
+}
+
 
 function move_snake(head, body, direction, dx, dy, width, height, top_boarder){
 	let new_segment = JSON.parse(JSON.stringify(head));
@@ -372,9 +402,6 @@ function draw_body(ctx, body, clr = "green"){
 function get_snake_color(){
 	if (godMode){
 		return "white";
-	}
-	if (pooShield){
-		return "#8B5E2B";
 	}
 	return "green";
 }
@@ -432,6 +459,19 @@ function is_coord_in_list(item, list){
 	return isin;
 }
 
+function get_random_safe_position(){
+	for (var i = 0; i < 80; i++){
+		var position = {x:rand_x(width), y:rand_y(height, top_boarder)};
+		if (!is_position_same(position, head) &&
+			!is_position_same(position, food_position) &&
+			!is_coord_in_list(position, body) &&
+			!is_coord_in_list(position, poos)){
+			return position;
+		}
+	}
+	return {x:width - 20, y:top_boarder + 20};
+}
+
 function get_poo_index_at_position(position){
 	for (var i = 0; i < poos.length; i++){
 		if (is_position_same(position, poos[i])){
@@ -467,7 +507,63 @@ function apply_magic_poo(type){
 	} else if (type == "white"){
 		godMode = true;
 	} else if (type == "blue"){
-		pooShield = true;
+		spawn_pet_fly();
+	}
+}
+
+function spawn_pet_fly(){
+	if (!petFly){
+		petFly = get_random_safe_position();
+	}
+	lastFlyMove = Date.now();
+}
+
+function get_nearest_poo(position){
+	if (poos.length == 0){
+		return null;
+	}
+	var nearest = poos[0];
+	var nearestDistance = Math.abs(position.x - nearest.x) + Math.abs(position.y - nearest.y);
+	for (var i = 1; i < poos.length; i++){
+		var distance = Math.abs(position.x - poos[i].x) + Math.abs(position.y - poos[i].y);
+		if (distance < nearestDistance){
+			nearest = poos[i];
+			nearestDistance = distance;
+		}
+	}
+	return nearest;
+}
+
+function move_pet_fly(){
+	if (!petFly){
+		return;
+	}
+	var now = Date.now();
+	if (now - lastFlyMove < flySpeed){
+		return;
+	}
+	lastFlyMove = now;
+	var target = get_nearest_poo(petFly);
+	if (!target){
+		var wander = Math.floor(Math.random() * 4);
+		if (wander == 0) petFly.x = petFly.x + 10;
+		else if (wander == 1) petFly.x = petFly.x - 10;
+		else if (wander == 2) petFly.y = petFly.y + 10;
+		else petFly.y = petFly.y - 10;
+	} else if (Math.abs(target.x - petFly.x) >= Math.abs(target.y - petFly.y) && target.x != petFly.x){
+		petFly.x = petFly.x + (target.x > petFly.x ? 10 : -10);
+	} else if (target.y != petFly.y){
+		petFly.y = petFly.y + (target.y > petFly.y ? 10 : -10);
+	}
+
+	if (petFly.x < 10) petFly.x = width - 10;
+	if (petFly.x > width - 10) petFly.x = 10;
+	if (petFly.y < top_boarder + 10) petFly.y = height - 10;
+	if (petFly.y > height - 10) petFly.y = top_boarder + 10;
+
+	var eatenPooIndex = get_poo_index_at_position(petFly);
+	if (eatenPooIndex >= 0){
+		poos.splice(eatenPooIndex, 1);
 	}
 }
 
@@ -479,15 +575,18 @@ function collision(){
 	var headInPoos = pooIndex >= 0;
 	var headInFood = is_position_same(food_position, head);
 	score_add = false; dead = "not";
-	if (headInPoos && poos[pooIndex].magicType && !(headInFood)){
+	if (petFly && is_position_same(head, petFly)){
+		petFly = null;
+		eatPulse = 6;
+	} else if (headInPoos && poos[pooIndex].magicType && !(headInFood)){
 		apply_magic_poo(poos[pooIndex].magicType);
 		poos.splice(pooIndex, 1);
 		eatPulse = 6;
 	} else if (headInBody && !godMode) {
 		dead = "body"; food_drawing = "mouse"; food_state = "uneaten";
-	} else if (headInPoos && !(headInFood) && !godMode && !pooShield){
+	} else if (headInPoos && !(headInFood) && !godMode){
 		dead = "poo"; food_drawing = "mouse"; food_state = "uneaten";
-	} else if (headInPoos && !(headInFood) && (godMode || pooShield)){
+	} else if (headInPoos && !(headInFood) && godMode){
 		poos.splice(pooIndex, 1);
 		eatPulse = 6;
 	} else if (headInFood && food_state == "uneaten"){
@@ -600,6 +699,7 @@ function main(){
 				pendingDirection = null;
 			}
 			expire_magic_poos();
+			move_pet_fly();
 			move_snake(head, body, direction, dx, dy, width, height,header_size = top_boarder);
 			collision();
 			document.addEventListener("keydown", keydown, {once:true});
@@ -612,6 +712,7 @@ function main(){
 			draw_body(ctx, body, clr = snakeColor);
 			draw_all_poos();
 			draw_food();
+			draw_fly(ctx, petFly);
 		}
 
 		// decrement eat pulse if active
@@ -623,7 +724,6 @@ function main(){
 			poos = [];
 			poosMadeThisLevel = 0;
 			godMode = false;
-			pooShield = false;
 			level = level + 1;
 			level_up();
 			speed = speed * 0.8;
@@ -672,7 +772,8 @@ function reset_game(){
 	eatPulse = 0;
 	pendingDirection = null;
 	godMode = false;
-	pooShield = false;
+	petFly = null;
+	lastFlyMove = 0;
 	main();
 }
 
@@ -721,6 +822,7 @@ function fitCanvasToWindow(){
 	draw_body(ctx, body, clr = snakeColor);
 	draw_all_poos();
 	draw_food();
+	draw_fly(ctx, petFly);
 }
 
 // touch/click visual feedback: draw a transient translucent circle at the tapped logical position
@@ -756,6 +858,7 @@ function showTouchFeedback(clientX, clientY){
 		draw_body(ctx, body, clr = snakeColor);
 		draw_all_poos();
 		draw_food();
+		draw_fly(ctx, petFly);
 	}, 180);
 }
 
