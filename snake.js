@@ -44,7 +44,7 @@ var food_drawing = "mouse"
 var again = false;
 var eatPulse = 0; // frames remaining for head/body pulse when eating
 var pendingDirection = null; // store one input between ticks to avoid 180° reversals
-var magicChance = 1 / 2;
+var magicChance = 1 / 15;
 var magicDuration = 5000;
 var magicTypes = {
 	yellow: {color: "#ffd83d", glow: "rgba(255, 216, 61, 0.45)", glowRgb: "255, 216, 61"},
