@@ -222,6 +222,10 @@ function mouse(context, x, y){
 }
 
 function display_score(context, score, level, width){
+	if (magicPopup){
+		display_magic_message(context, width);
+		return;
+	}
 	context.font = "20px Courier";
 	context.fillStyle = "white";
 	context.fillText("Level: "+level, 25 ,27);
@@ -373,13 +377,13 @@ function get_magic_effect_text(type){
 
 function show_magic_popup(type){
 	magicPopup = {
-		title: "magic poo!",
+		title: "Magic poo!",
 		detail: get_magic_effect_text(type),
-		expiresAt: Date.now() + 1500
+		expiresAt: Date.now() + 2200
 	};
 }
 
-function draw_magic_popup(){
+function display_magic_message(context, width){
 	if (!magicPopup){
 		return;
 	}
@@ -389,21 +393,20 @@ function draw_magic_popup(){
 	}
 	var remaining = magicPopup.expiresAt - Date.now();
 	var alpha = Math.min(1, remaining / 350);
-	ctx.save();
-	ctx.globalAlpha = alpha;
-	ctx.textAlign = "center";
-	ctx.font = "18px Courier";
-	ctx.fillStyle = "rgba(0,0,0,0.72)";
-	ctx.fillRect(55, top_boarder + 18, width - 110, 48);
-	ctx.strokeStyle = "rgba(255,255,255,0.6)";
-	ctx.strokeRect(55, top_boarder + 18, width - 110, 48);
-	ctx.fillStyle = "white";
-	ctx.fillText(magicPopup.title, width / 2, top_boarder + 38);
-	ctx.font = "14px Courier";
-	ctx.fillText(magicPopup.detail, width / 2, top_boarder + 58);
-	ctx.restore();
+	context.save();
+	context.globalAlpha = alpha;
+	context.textAlign = "center";
+	context.fillStyle = "rgba(0,0,0,0.92)";
+	context.fillRect(0, 0, width, top_boarder - 2);
+	context.strokeStyle = "rgba(255,255,255,0.45)";
+	context.strokeRect(6, 6, width - 12, top_boarder - 14);
+	context.fillStyle = "white";
+	context.font = "16px Courier";
+	context.fillText(magicPopup.title, width / 2, 20);
+	context.font = "13px Courier";
+	context.fillText(magicPopup.detail, width / 2, 38);
+	context.restore();
 }
-
 
 function draw_food(){
 	if (food_drawing == "mouse"){
@@ -877,7 +880,6 @@ function main(){
 			draw_all_poos();
 			draw_food();
 			draw_fly(ctx, petFly);
-			draw_magic_popup();
 		}
 
 		// decrement eat pulse if active
@@ -992,7 +994,6 @@ function fitCanvasToWindow(){
 	draw_all_poos();
 	draw_food();
 	draw_fly(ctx, petFly);
-	draw_magic_popup();
 }
 
 // touch/click visual feedback: draw a transient translucent circle at the tapped logical position
@@ -1029,7 +1030,6 @@ function showTouchFeedback(clientX, clientY){
 		draw_all_poos();
 		draw_food();
 		draw_fly(ctx, petFly);
-		draw_magic_popup();
 	}, 180);
 }
 
