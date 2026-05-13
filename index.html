@@ -11,31 +11,192 @@
     <body style="background-color:black;">
 
         <div class="title-row">
-            <h1 title="The real snake number 2"><b style="color:saddlebrown;">POO </b><b>SNAKE</b></h1>
-            <div class="subtitle">snake number 2!</div>
-            <button id="infoBtn" class="info-icon" aria-label="Instructions">i</button>
+            <div class="title-stack">
+                <h1 title="The real snake number 2"><b style="color:saddlebrown;">POO </b><b>SNAKE</b></h1>
+                <div class="subtitle">snake number 2!</div>
+            </div>
+            <div class="menu-wrap">
+                <button id="menuBtn" class="menu-button" aria-label="Menu" aria-expanded="false">&#9776;</button>
+                <div id="menuPanel" class="menu-panel hidden">
+                    <button id="infoBtn" type="button">Info</button>
+                    <button id="leaderboardBtn" type="button">Leaderboard</button>
+                </div>
+            </div>
         </div>
-        <div id="instructions" class="instructions hidden">
-            <p>Controls:</p>
-            <ul>
-                <li>Mobile: tap the top/bottom half to go up/down while moving left/right.</li>
-                <li>Tap left/right half to go left/right while moving up/down.</li>
-                <li>Keyboard arrow keys also work on desktop.</li>
-            </ul>
-            <p>Magic poos:</p>
-            <ul>
-                <li>Yellow slows you down.</li>
-                <li>Green halves your length.</li>
-                <li>White gives god mode until the next level.</li>
-                <li>Blue gives you a pet fly that eats poos.</li>
-            </ul>
-            <p>Glowing poos only stay magic for a few seconds. The fly stays until you eat it.</p>
+        <div id="infoModal" class="modal hidden">
+            <div id="instructions" class="instructions modal-content">
+                <p>Controls:</p>
+                <ul>
+                    <li>Mobile: tap the top/bottom half to go up/down while moving left/right.</li>
+                    <li>Tap left/right half to go left/right while moving up/down.</li>
+                    <li>Keyboard arrow keys also work on desktop.</li>
+                </ul>
+                <p>Magic poos:</p>
+                <ul>
+                    <li>Yellow slows you down.</li>
+                    <li>Green halves your length.</li>
+                    <li>White gives god mode until the next level.</li>
+                    <li>Blue gives you a pet fly that eats poos.</li>
+                </ul>
+                <p>Glowing poos only stay magic for a few seconds. The fly stays until you eat it.</p>
+            </div>
         </div>
         <div class="game-wrap">
             <canvas id="gameWindow"></canvas>
             <button id="retryBtn" class="retry-button hidden" type="button">Retry</button>
+            <button id="shareBtn" class="share-button hidden" type="button">Share</button>
         </div>
-        <p class="controls-hint">Tap the canvas to control the snake. Keyboard arrows work too.</p>
+        <div id="scoreSubmitPanel" class="death-submit hidden">
+            <label>
+                Name
+                <input id="deathPlayerName" maxlength="16" autocomplete="nickname" value="Player">
+            </label>
+            <button id="submitScoreBtn" type="button">Submit score</button>
+            <p id="deathSubmitStatus"></p>
+        </div>
+        <div id="leaderboardModal" class="modal hidden">
+            <section id="leaderboardPanel" class="leaderboard modal-content" aria-labelledby="leaderboardTitle">
+                <div class="leaderboard-header">
+                    <h2 id="leaderboardTitle">Leaderboard</h2>
+                    <label>
+                        Name
+                        <input id="leaderboardName" maxlength="16" autocomplete="nickname" value="Player">
+                    </label>
+                </div>
+                <ol id="leaderboardList">
+                    <li>Open leaderboard to load scores</li>
+                </ol>
+                <p id="leaderboardStatus" class="leaderboard-status"></p>
+            </section>
+        </div>
+        <script type="module">
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+            import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+            import { getFirestore, collection, addDoc, getCountFromServer, getDocs, limit, orderBy, query, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+            const firebaseConfig = {
+                apiKey: "AIzaSyC3fq2MRsNFUpMo-tBEhUcdKiogcJiYsA4",
+                authDomain: "poosnake-8e704.firebaseapp.com",
+                projectId: "poosnake-8e704",
+                storageBucket: "poosnake-8e704.firebasestorage.app",
+                messagingSenderId: "1053302530839",
+                appId: "1:1053302530839:web:b1f26d3d6aecd51cd20d52",
+                measurementId: "G-45NMJRN408"
+            };
+
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+            const leaderboardCollection = collection(db, "leaderboard");
+            const leaderboardNameInput = document.getElementById("leaderboardName");
+            const deathNameInput = document.getElementById("deathPlayerName");
+            const leaderboardList = document.getElementById("leaderboardList");
+            const leaderboardStatus = document.getElementById("leaderboardStatus");
+            const deathSubmitStatus = document.getElementById("deathSubmitStatus");
+            const savedPlayerName = window.localStorage.getItem("poosnakePlayerName");
+
+            if (savedPlayerName) {
+                if (leaderboardNameInput) leaderboardNameInput.value = savedPlayerName;
+                if (deathNameInput) deathNameInput.value = savedPlayerName;
+            }
+
+            function cleanPlayerName(name) {
+                return (name || "Player").replace(/[^\w ]/g, "").trim().slice(0, 16) || "Player";
+            }
+
+            function setStatus(message) {
+                if (leaderboardStatus) {
+                    leaderboardStatus.textContent = message;
+                }
+                if (deathSubmitStatus) {
+                    deathSubmitStatus.textContent = message;
+                }
+            }
+
+            async function signIn() {
+                if (auth.currentUser) {
+                    return auth.currentUser;
+                }
+                const credential = await signInAnonymously(auth);
+                return credential.user;
+            }
+
+            async function loadScores() {
+                if (!leaderboardList) {
+                    return;
+                }
+                try {
+                    await signIn();
+                    const scoresQuery = query(leaderboardCollection, orderBy("score", "desc"), limit(10));
+                    const snapshot = await getDocs(scoresQuery);
+                    leaderboardList.innerHTML = "";
+                    if (snapshot.empty) {
+                        leaderboardList.innerHTML = "<li>No scores yet</li>";
+                    } else {
+                        snapshot.forEach((doc) => {
+                            const entry = doc.data();
+                            const item = document.createElement("li");
+                            item.textContent = `${entry.name || "Player"} - ${entry.score || 0} poos, level ${entry.level || 1}`;
+                            leaderboardList.appendChild(item);
+                        });
+                    }
+                    setStatus("");
+                } catch (error) {
+                    leaderboardList.innerHTML = "<li>Leaderboard unavailable</li>";
+                    setStatus("Leaderboard unavailable");
+                    console.error("Leaderboard load failed", error);
+                }
+            }
+
+            async function submitScore(result) {
+                try {
+                    const user = await signIn();
+                    const name = cleanPlayerName(result.name || (deathNameInput ? deathNameInput.value : "") || (leaderboardNameInput ? leaderboardNameInput.value : "Player"));
+                    window.localStorage.setItem("poosnakePlayerName", name);
+                    if (leaderboardNameInput) leaderboardNameInput.value = name;
+                    if (deathNameInput) deathNameInput.value = name;
+                    await addDoc(leaderboardCollection, {
+                        name: name,
+                        score: result.score || 0,
+                        level: result.level || 1,
+                        cause: result.cause || "unknown",
+                        uid: user.uid,
+                        createdAt: serverTimestamp()
+                    });
+                    setStatus("Score submitted");
+                    await loadScores();
+                    return true;
+                } catch (error) {
+                    setStatus("Score not submitted");
+                    console.error("Leaderboard submit failed", error);
+                    return false;
+                }
+            }
+
+            async function getRank(score) {
+                try {
+                    await signIn();
+                    const betterScoresQuery = query(leaderboardCollection, where("score", ">", score || 0));
+                    const snapshot = await getCountFromServer(betterScoresQuery);
+                    return snapshot.data().count + 1;
+                } catch (error) {
+                    console.error("Leaderboard rank failed", error);
+                    return null;
+                }
+            }
+
+            [leaderboardNameInput, deathNameInput].forEach((input) => {
+                if (!input) return;
+                input.addEventListener("change", function(){
+                    const cleanName = cleanPlayerName(input.value);
+                    if (leaderboardNameInput) leaderboardNameInput.value = cleanName;
+                    if (deathNameInput) deathNameInput.value = cleanName;
+                    window.localStorage.setItem("poosnakePlayerName", cleanName);
+                });
+            });
+
+            window.pooSnakeLeaderboard = {loadScores, submitScore, getRank};
+        </script>
         <script src="snake.js"></script>
 
     </body>

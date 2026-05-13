@@ -8,6 +8,11 @@
 var canvas = document.getElementById("gameWindow");
 var ctx = canvas.getContext("2d");
 var retryButton = document.getElementById("retryBtn");
+var shareButton = document.getElementById("shareBtn");
+var scoreSubmitPanel = document.getElementById("scoreSubmitPanel");
+var deathPlayerName = document.getElementById("deathPlayerName");
+var submitScoreButton = document.getElementById("submitScoreBtn");
+var deathSubmitStatus = document.getElementById("deathSubmitStatus");
 var bodysize_full = 10;
 var bodysize_empty = 4;
 var poosize = 3; // increased for visibility
@@ -60,6 +65,10 @@ var highScoreStorageKey = "poosnakeHighScore";
 var petFly = null;
 var flySpeed = 275;
 var lastFlyMove = 0;
+var leaderboardSubmitted = false;
+var currentDeathResult = null;
+var deathRankText = "rank: loading...";
+var magicPopup = null;
 
 
 
@@ -259,6 +268,34 @@ function get_cause_of_death(){
 	return "unknown";
 }
 
+function submit_leaderboard_score(finalScore, finalLevel, finalCause){
+	if (leaderboardSubmitted || !window.pooSnakeLeaderboard || !window.pooSnakeLeaderboard.submitScore){
+		return null;
+	}
+	leaderboardSubmitted = true;
+	return window.pooSnakeLeaderboard.submitScore({
+		score: finalScore,
+		level: finalLevel,
+		cause: finalCause,
+		name: deathPlayerName ? deathPlayerName.value : "Player"
+	});
+}
+
+function request_overall_rank(finalScore){
+	deathRankText = "rank: loading...";
+	if (!window.pooSnakeLeaderboard || !window.pooSnakeLeaderboard.getRank){
+		deathRankText = "rank: unavailable";
+		return;
+	}
+	window.pooSnakeLeaderboard.getRank(finalScore).then(function(rank){
+		if (rank){
+			deathRankText = "rank: #" + rank;
+		} else {
+			deathRankText = "rank: unavailable";
+		}
+	});
+}
+
 function clear_score(){
 	ctx.clearRect(0,0, Math.floor(width/2) - 1, 49);
 	ctx.clearRect(Math.floor(width/2)+1,0, Math.floor(width/2) - 1, 49);
@@ -316,6 +353,55 @@ function draw_poo(context,poosize, x, y, magicType){
 	context.arc(x-1, y-3, Math.max(1, poosize/1.4), 0, Math.PI*2);
 	context.fill();
 	context.closePath();
+}
+
+function get_magic_effect_text(type){
+	if (type == "yellow"){
+		return "speed -10%";
+	}
+	if (type == "green"){
+		return "length halved";
+	}
+	if (type == "white"){
+		return "god mode";
+	}
+	if (type == "blue"){
+		return "pet fly";
+	}
+	return "magic";
+}
+
+function show_magic_popup(type){
+	magicPopup = {
+		title: "magic poo!",
+		detail: get_magic_effect_text(type),
+		expiresAt: Date.now() + 1500
+	};
+}
+
+function draw_magic_popup(){
+	if (!magicPopup){
+		return;
+	}
+	if (Date.now() > magicPopup.expiresAt){
+		magicPopup = null;
+		return;
+	}
+	var remaining = magicPopup.expiresAt - Date.now();
+	var alpha = Math.min(1, remaining / 350);
+	ctx.save();
+	ctx.globalAlpha = alpha;
+	ctx.textAlign = "center";
+	ctx.font = "18px Courier";
+	ctx.fillStyle = "rgba(0,0,0,0.72)";
+	ctx.fillRect(55, top_boarder + 18, width - 110, 48);
+	ctx.strokeStyle = "rgba(255,255,255,0.6)";
+	ctx.strokeRect(55, top_boarder + 18, width - 110, 48);
+	ctx.fillStyle = "white";
+	ctx.fillText(magicPopup.title, width / 2, top_boarder + 38);
+	ctx.font = "14px Courier";
+	ctx.fillText(magicPopup.detail, width / 2, top_boarder + 58);
+	ctx.restore();
 }
 
 
@@ -509,6 +595,7 @@ function apply_magic_poo(type){
 	} else if (type == "blue"){
 		spawn_pet_fly();
 	}
+	show_magic_popup(type);
 }
 
 function spawn_pet_fly(){
@@ -640,7 +727,7 @@ function level_up(){
 			game_paused = false;
 			window.clearInterval(lvlupId);
 		}
-	}, 70)
+	}, 120)
 }
 
 
@@ -656,6 +743,11 @@ function show_retry_button(){
 		retryButton.classList.add("is-visible");
 		retryButton.style.display = "block";
 	}
+	if (shareButton){
+		shareButton.classList.remove("hidden");
+		shareButton.classList.add("is-visible");
+		shareButton.style.display = "block";
+	}
 }
 
 function hide_retry_button(){
@@ -663,6 +755,69 @@ function hide_retry_button(){
 		retryButton.classList.remove("is-visible");
 		retryButton.classList.add("hidden");
 		retryButton.style.display = "none";
+	}
+	if (shareButton){
+		shareButton.classList.remove("is-visible");
+		shareButton.classList.add("hidden");
+		shareButton.style.display = "none";
+	}
+}
+
+function show_score_submit(finalScore, finalLevel, finalCause){
+	currentDeathResult = {
+		score: finalScore,
+		level: finalLevel,
+		cause: finalCause
+	};
+	if (scoreSubmitPanel){
+		scoreSubmitPanel.classList.remove("hidden");
+	}
+	if (submitScoreButton){
+		submitScoreButton.disabled = false;
+		submitScoreButton.textContent = "Submit score";
+	}
+	if (deathSubmitStatus){
+		deathSubmitStatus.textContent = "";
+	}
+}
+
+function hide_score_submit(){
+	currentDeathResult = null;
+	if (scoreSubmitPanel){
+		scoreSubmitPanel.classList.add("hidden");
+	}
+	if (deathSubmitStatus){
+		deathSubmitStatus.textContent = "";
+	}
+	if (submitScoreButton){
+		submitScoreButton.disabled = false;
+		submitScoreButton.textContent = "Submit score";
+	}
+}
+
+function get_share_text(){
+	if (!currentDeathResult){
+		return "try to beat my score on poosnake.com";
+	}
+	return "I did " + currentDeathResult.score + " poos and reached level " + currentDeathResult.level + ". try to beat my score on poosnake.com";
+}
+
+function share_score(){
+	var shareText = get_share_text();
+	var shareUrl = "https://poosnake.com";
+	if (navigator.share){
+		navigator.share({
+			title: "Poo Snake",
+			text: shareText,
+			url: shareUrl
+		}).catch(function(){});
+		return;
+	}
+	if (navigator.clipboard && navigator.clipboard.writeText){
+		navigator.clipboard.writeText(shareText + " " + shareUrl);
+		if (deathSubmitStatus){
+			deathSubmitStatus.textContent = "Share text copied";
+		}
 	}
 }
 
@@ -676,16 +831,25 @@ function death_screen(){
 	var finalLevel = level;
 	var finalCause = get_cause_of_death();
 	var highScore = update_high_score(finalScore);
+	show_score_submit(finalScore, finalLevel, finalCause);
+	request_overall_rank(finalScore);
 	deathIntervalId = window.setInterval(function print_death(){
 		clear_screen();
-		ctx.font = "16px Courier";
 		draw_head(ctx,head.x,head.y, direction, radius = 6, outline = "gray", fill = "gray");
 		draw_body(ctx, body, clr = "gray");
+		ctx.textAlign = "center";
 		ctx.fillStyle = "lime";
-		ctx.fillText("poos done: " + finalScore, 10, 70);
-		ctx.fillText("level: " + finalLevel, 10, 100);
-		ctx.fillText("cause of death: " + finalCause, 10, 130);
-		ctx.fillText("high score: " + highScore, 10, 160);
+		ctx.font = "16px Courier";
+		ctx.fillText("+----------------------+", width / 2, 72);
+		ctx.fillText("|      GAME OVER       |", width / 2, 92);
+		ctx.fillText("+----------------------+", width / 2, 112);
+		ctx.font = "14px Courier";
+		ctx.fillText("poos done: " + finalScore, width / 2, 142);
+		ctx.fillText("level: " + finalLevel, width / 2, 164);
+		ctx.fillText("cause: " + finalCause, width / 2, 186);
+		ctx.fillText("high score: " + highScore, width / 2, 208);
+		ctx.fillText(deathRankText, width / 2, 230);
+		ctx.textAlign = "left";
 	},50)
 }
 
@@ -713,6 +877,7 @@ function main(){
 			draw_all_poos();
 			draw_food();
 			draw_fly(ctx, petFly);
+			draw_magic_popup();
 		}
 
 		// decrement eat pulse if active
@@ -750,6 +915,7 @@ function reset_game(){
 		deathIntervalId = null;
 	}
 	hide_retry_button();
+	hide_score_submit();
 	new_segment = null
 	head = {x:50, y: 250};
 	body = [{x:40, y:250}];
@@ -774,6 +940,9 @@ function reset_game(){
 	godMode = false;
 	petFly = null;
 	lastFlyMove = 0;
+	leaderboardSubmitted = false;
+	deathRankText = "rank: loading...";
+	magicPopup = null;
 	main();
 }
 
@@ -823,6 +992,7 @@ function fitCanvasToWindow(){
 	draw_all_poos();
 	draw_food();
 	draw_fly(ctx, petFly);
+	draw_magic_popup();
 }
 
 // touch/click visual feedback: draw a transient translucent circle at the tapped logical position
@@ -859,6 +1029,7 @@ function showTouchFeedback(clientX, clientY){
 		draw_all_poos();
 		draw_food();
 		draw_fly(ctx, petFly);
+		draw_magic_popup();
 	}, 180);
 }
 
@@ -923,6 +1094,43 @@ if (retryButton){
 		reset_game();
 	});
 }
+if (shareButton){
+	shareButton.addEventListener('click', share_score);
+	shareButton.addEventListener('touchend', function(e){
+		e.preventDefault();
+		share_score();
+	});
+}
+if (submitScoreButton){
+	submitScoreButton.addEventListener('click', function(){
+		if (!currentDeathResult){
+			return;
+		}
+		if (!window.pooSnakeLeaderboard || !window.pooSnakeLeaderboard.submitScore){
+			if (deathSubmitStatus){
+				deathSubmitStatus.textContent = "Leaderboard unavailable";
+			}
+			return;
+		}
+		if (leaderboardSubmitted){
+			return;
+		}
+		submitScoreButton.disabled = true;
+		submitScoreButton.textContent = "Submitting...";
+		var submitPromise = submit_leaderboard_score(currentDeathResult.score, currentDeathResult.level, currentDeathResult.cause);
+		if (submitPromise && submitPromise.then){
+			submitPromise.then(function(submitted){
+				if (submitted){
+					submitScoreButton.textContent = "Submitted";
+				} else {
+					leaderboardSubmitted = false;
+					submitScoreButton.disabled = false;
+					submitScoreButton.textContent = "Submit score";
+				}
+			});
+		}
+	});
+}
 
 // Refit canvas on resize or orientation change
 window.addEventListener('resize', function(){
@@ -936,15 +1144,89 @@ window.addEventListener('resize', function(){
 // initial fit
 fitCanvasToWindow();
 
-// Instructions toggle wiring
+// Menu wiring
 window.addEventListener('load', function(){
+	var menuBtn = document.getElementById('menuBtn');
+	var menuPanel = document.getElementById('menuPanel');
 	var infoBtn = document.getElementById('infoBtn');
-	var instr = document.getElementById('instructions');
-	if (infoBtn && instr){
-		infoBtn.addEventListener('click', function(){
-			instr.classList.toggle('hidden');
+	var leaderboardBtn = document.getElementById('leaderboardBtn');
+	var infoModal = document.getElementById('infoModal');
+	var leaderboardModal = document.getElementById('leaderboardModal');
+
+	function close_menu(){
+		if (menuBtn && menuPanel){
+			menuPanel.classList.add('hidden');
+			menuBtn.setAttribute('aria-expanded', 'false');
+		}
+	}
+
+	function close_modals(){
+		if (infoModal){
+			infoModal.classList.add('hidden');
+		}
+		if (leaderboardModal){
+			leaderboardModal.classList.add('hidden');
+		}
+	}
+
+	if (menuBtn && menuPanel){
+		menuBtn.addEventListener('click', function(event){
+			event.stopPropagation();
+			var isOpen = !menuPanel.classList.contains('hidden');
+			menuPanel.classList.toggle('hidden');
+			menuBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
 		});
 	}
+
+	if (infoBtn && infoModal){
+		infoBtn.addEventListener('click', function(){
+			close_modals();
+			infoModal.classList.remove('hidden');
+			close_menu();
+		});
+	}
+
+	if (leaderboardBtn && leaderboardModal){
+		leaderboardBtn.addEventListener('click', function(){
+			close_modals();
+			leaderboardModal.classList.remove('hidden');
+			if (window.pooSnakeLeaderboard &&
+				window.pooSnakeLeaderboard.loadScores){
+				window.pooSnakeLeaderboard.loadScores();
+			}
+			close_menu();
+		});
+	}
+
+	[infoModal, leaderboardModal].forEach(function(modal){
+		if (!modal){
+			return;
+		}
+		modal.addEventListener('click', function(event){
+			if (event.target == modal){
+				modal.classList.add('hidden');
+			}
+		});
+		var content = modal.querySelector('.modal-content');
+		if (content){
+			content.addEventListener('click', function(event){
+				event.stopPropagation();
+			});
+		}
+	});
+
+	document.addEventListener('click', function(event){
+		if (menuPanel && menuBtn && !menuPanel.contains(event.target) && event.target !== menuBtn){
+			close_menu();
+		}
+	});
+
+	document.addEventListener('keydown', function(event){
+		if (event.key == 'Escape'){
+			close_menu();
+			close_modals();
+		}
+	});
 });
 
 
