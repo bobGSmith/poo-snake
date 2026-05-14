@@ -127,7 +127,7 @@
                 }
                 try {
                     await signIn();
-                    const scoresQuery = query(leaderboardCollection, orderBy("score", "desc"), limit(10));
+                    const scoresQuery = query(leaderboardCollection, orderBy("score", "desc"), limit(100));
                     const snapshot = await getDocs(scoresQuery);
                     leaderboardList.innerHTML = "";
                     if (snapshot.empty) {
@@ -140,7 +140,7 @@
                             leaderboardList.appendChild(item);
                         });
                     }
-                    setStatus("");
+                    setStatus(snapshot.size > 10 ? "Scroll for more scores" : "");
                 } catch (error) {
                     leaderboardList.innerHTML = "<li>Leaderboard unavailable</li>";
                     setStatus("Leaderboard unavailable");
@@ -197,7 +197,7 @@
 
             window.pooSnakeLeaderboard = {loadScores, submitScore, getRank};
         </script>
-        <script src="snake.js?v=20260513-magic-header"></script>
+        <script src="snake.js?v=20260514-diarrhea-mode"></script>
 
     </body>
 

@@ -294,11 +294,18 @@ canvas {
 
 .leaderboard ol {
 	margin: 0.5rem 0 0;
-	padding-left: 1.5rem;
+	padding-left: 0;
+	max-height: 15.8rem;
+	overflow-y: auto;
+	list-style-position: inside;
+	scrollbar-color: limegreen #090909;
+	scrollbar-width: thin;
 }
 
 .leaderboard li {
 	margin: 0.25rem 0;
+	line-height: 1.45;
+	padding-right: 0.35rem;
 }
 
 .leaderboard-status {

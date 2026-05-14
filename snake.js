@@ -1,4 +1,4 @@
-					
+
 								// SNAKE GAME LOGIC //
 
 // INITIAL SETUP //
@@ -29,7 +29,7 @@ var intervalId = null;
 
 
 
-var new_segment = null 
+var new_segment = null
 var head = {x:50, y: 250};
 var body = [{x:40, y:250}];
 var poos = [];
@@ -47,6 +47,7 @@ var score_add = false;
 var dead = "not";
 var food_drawing = "mouse"
 var again = false;
+var diarrheaDuration = 5; // number of mouse poos affected after eating a fly
 var eatPulse = 0; // frames remaining for head/body pulse when eating
 var pendingDirection = null; // store one input between ticks to avoid 180° reversals
 var magicChance = 1 / 15;
@@ -65,6 +66,8 @@ var highScoreStorageKey = "poosnakeHighScore";
 var petFly = null;
 var flySpeed = 275;
 var lastFlyMove = 0;
+var diarrheaMode = false;
+var diarrheaPoosRemaining = 0;
 var leaderboardSubmitted = false;
 var currentDeathResult = null;
 var deathRankText = "rank: loading...";
@@ -230,6 +233,20 @@ function display_score(context, score, level, width){
 	context.fillStyle = "white";
 	context.fillText("Level: "+level, 25 ,27);
 	context.fillText("Poos: " +score, Math.floor(width/2)+25 ,27);
+	if (diarrheaMode){
+		var boxWidth = 96;
+		var boxX = (width - boxWidth) / 2;
+		context.fillStyle = "black";
+		context.fillRect(boxX, 8, boxWidth, 34);
+		context.strokeStyle = "white";
+		context.lineWidth = 1;
+		context.strokeRect(boxX + 0.5, 8.5, boxWidth - 1, 33);
+		context.font = "12px Courier";
+		context.fillStyle = "white";
+		context.textAlign = "center";
+		context.fillText("Diarrhea!", width / 2, 29);
+		context.textAlign = "left";
+	}
 }
 
 function display_error(context, error = "error"){
@@ -498,7 +515,7 @@ function get_snake_color(){
 function rand_y(height, top_boarder){
 	var max = height - 10;
 	var min = top_boarder + 10;
-	return (Math.round((Math.random()*(max - min) + min) /10 )) * 10;	
+	return (Math.round((Math.random()*(max - min) + min) /10 )) * 10;
 }
 
 function rand_x(width){
@@ -534,7 +551,7 @@ function is_position_same(coord_obj1, coord_obj2){
 	if (coord_obj1.x == coord_obj2.x && coord_obj1.y == coord_obj2.y){
 		return true;
 	} else {
-		return false; 
+		return false;
 	}
 }
 
@@ -542,10 +559,56 @@ function is_coord_in_list(item, list){
 	var isin = false
 	for (var i = 0; i < list.length; i++){
 		if (is_position_same(item, list[i])){
-			isin = true; break; 
+			isin = true; break;
 		}
 	}
 	return isin;
+}
+
+function get_position_behind(position, direction, distance){
+	var offset = distance * 10;
+	if (direction == "w"){
+		return {x:position.x + offset, y:position.y};
+	}
+	if (direction == "e"){
+		return {x:position.x - offset, y:position.y};
+	}
+	if (direction == "n"){
+		return {x:position.x, y:position.y + offset};
+	}
+	return {x:position.x, y:position.y - offset};
+}
+
+function wrap_position(position){
+	if (position.x < 10) position.x = width - 10;
+	if (position.x > width - 10) position.x = 10;
+	if (position.y < top_boarder + 10) position.y = height - 10;
+	if (position.y > height - 10) position.y = top_boarder + 10;
+	return position;
+}
+
+function is_safe_food_position(position){
+	return !is_position_same(position, head) &&
+		!is_coord_in_list(position, body) &&
+		!is_coord_in_list(position, poos);
+}
+
+function get_random_safe_food_position(){
+	for (var i = 0; i < 120; i++){
+		var position = {x:rand_x(width), y:rand_y(height, top_boarder)};
+		if (is_safe_food_position(position)){
+			return position;
+		}
+	}
+	for (var y = top_boarder + 10; y <= height - 10; y = y + 10){
+		for (var x = 10; x <= width - 10; x = x + 10){
+			var fallback = {x:x, y:y};
+			if (is_safe_food_position(fallback)){
+				return fallback;
+			}
+		}
+	}
+	return {x:width - 20, y:top_boarder + 20};
 }
 
 function get_random_safe_position(){
@@ -568,6 +631,37 @@ function get_poo_index_at_position(position){
 		}
 	}
 	return -1;
+}
+
+function add_plain_poo(position){
+	position = wrap_position({x:position.x, y:position.y});
+	if (!is_coord_in_list(position, poos)){
+		poos.push(position);
+	}
+}
+
+function make_diarrhea_streak_at(position, streakDirection){
+	add_plain_poo(position);
+	for (var i = 1; i < 3; i++){
+		add_plain_poo(get_position_behind(position, streakDirection, i));
+	}
+	if (food_state == "uneaten" && is_coord_in_list(food_position, poos)){
+		food_position = get_random_safe_food_position();
+	}
+}
+
+function make_diarrhea_streak(){
+	add_plain_poo(head);
+	for (var i = 1; i < 3; i++){
+		if (body.length >= i){
+			add_plain_poo(body[body.length - i]);
+		} else {
+			add_plain_poo(get_position_behind(head, direction, i));
+		}
+	}
+	if (food_state == "uneaten" && is_coord_in_list(food_position, poos)){
+		food_position = get_random_safe_food_position();
+	}
 }
 
 function maybe_make_magic_poo(poo){
@@ -667,6 +761,9 @@ function collision(){
 	score_add = false; dead = "not";
 	if (petFly && is_position_same(head, petFly)){
 		petFly = null;
+		diarrheaMode = true;
+		diarrheaPoosRemaining = diarrheaDuration;
+		make_diarrhea_streak();
 		eatPulse = 6;
 	} else if (headInPoos && poos[pooIndex].magicType && !(headInFood)){
 		apply_magic_poo(poos[pooIndex].magicType);
@@ -688,11 +785,20 @@ function collision(){
 		food_drawing = "full_body";
 	} else if (food_state == "digesting" && foodInBody == false){
 		let new_dump = JSON.parse(JSON.stringify(food_position));
-		poos.push(maybe_make_magic_poo(new_dump));
+		if (diarrheaMode){
+			make_diarrhea_streak_at(new_dump, direction);
+			diarrheaPoosRemaining = diarrheaPoosRemaining - 1;
+			if (diarrheaPoosRemaining <= 0){
+				diarrheaMode = false;
+				diarrheaPoosRemaining = 0;
+			}
+		} else {
+			poos.push(maybe_make_magic_poo(new_dump));
+		}
 		poosMadeThisLevel = poosMadeThisLevel + 1;
 		let new_body_segment = JSON.parse(JSON.stringify(food_position));
 		body.unshift(new_body_segment)
-		food_position = {x:rand_x(width), y:rand_y(height, top_boarder)};
+		food_position = get_random_safe_food_position();
 		food_state = "uneaten";
 		food_drawing = "mouse";
 	} else {
@@ -721,7 +827,7 @@ function level_up(){
 			lvl_a = "LVL ITS A SHIT FEST LVL"
 			ctx.fillStyle = "white";
 		}
-		ctx.fillText(lvl_a, 5 ,y_pos);	
+		ctx.fillText(lvl_a, 5 ,y_pos);
 		ctx.clearRect(45,118,220, 52);
 		ctx.font = "40px Courier";
 		ctx.fillText("LEVEL " + level, 80, 160);
@@ -891,6 +997,8 @@ function main(){
 			poos = [];
 			poosMadeThisLevel = 0;
 			godMode = false;
+			diarrheaMode = false;
+			diarrheaPoosRemaining = 0;
 			level = level + 1;
 			level_up();
 			speed = speed * 0.8;
@@ -942,6 +1050,8 @@ function reset_game(){
 	godMode = false;
 	petFly = null;
 	lastFlyMove = 0;
+	diarrheaMode = false;
+	diarrheaPoosRemaining = 0;
 	leaderboardSubmitted = false;
 	deathRankText = "rank: loading...";
 	magicPopup = null;
